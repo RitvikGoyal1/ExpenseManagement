@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, radii, spacing } from '@/constants/theme';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { Box } from '@/components/ui/box';
+import { Text } from '@/components/ui/text';
+import { colors } from '@/constants/theme';
 import { Transaction, TransactionCategory } from '@/types/transaction';
 import { formatCurrency, formatShortDate } from '@/utils/format';
 
@@ -21,69 +23,43 @@ const CATEGORY_ICON: Record<TransactionCategory, IconName> = {
 
 interface TransactionRowProps {
   transaction: Transaction;
+  onPress?: () => void;
 }
 
-export function TransactionRow({ transaction }: TransactionRowProps) {
-  const { merchant, category, amount, date } = transaction;
+export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
+  const { merchant, category, amount, date, isDeductible } = transaction;
   const isIncome = amount > 0;
 
   return (
-    <View style={styles.row}>
-      <View style={[styles.iconWrap, { backgroundColor: isIncome ? colors.incomeSoft : colors.background }]}>
+    <AnimatedPressable className="flex-row items-center py-3" scaleTo={0.98} onPress={onPress}>
+      <Box className={`mr-4 h-10 w-10 items-center justify-center rounded-md ${isIncome ? 'bg-income/16' : 'bg-popover'}`}>
         <Ionicons
           name={CATEGORY_ICON[category]}
           size={18}
           color={isIncome ? colors.income : colors.textSecondary}
         />
-      </View>
+      </Box>
 
-      <View style={styles.details}>
-        <Text style={styles.merchant} numberOfLines={1}>
-          {merchant}
-        </Text>
-        <Text style={styles.meta}>
+      <Box className="flex-1">
+        <Box className="flex-row items-center">
+          <Text className="font-body-semibold text-[15px] text-foreground" numberOfLines={1}>
+            {merchant}
+          </Text>
+          {isDeductible && (
+            <Box className="ml-1 h-4 w-4 items-center justify-center rounded-full bg-gold/16">
+              <Ionicons name="document-text" size={9} color={colors.gold} />
+            </Box>
+          )}
+        </Box>
+        <Text className="mt-[3px] font-mono text-[11px] text-muted-foreground">
           {category} · {formatShortDate(date)}
         </Text>
-      </View>
+      </Box>
 
-      <Text style={[styles.amount, { color: isIncome ? colors.income : colors.textPrimary }]}>
+      <Text className={`ml-2 font-mono-semibold text-[15px] ${isIncome ? 'text-income' : 'text-foreground'}`}>
         {isIncome ? '+' : ''}
         {formatCurrency(amount)}
       </Text>
-    </View>
+    </AnimatedPressable>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm + 4,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  details: {
-    flex: 1,
-  },
-  merchant: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  meta: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  amount: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: spacing.sm,
-  },
-});

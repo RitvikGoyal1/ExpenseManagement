@@ -1,79 +1,54 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useRouter } from 'expo-router';
 
 import { MonthSummaryCard } from '@/components/home/MonthSummaryCard';
 import { TransactionRow } from '@/components/home/TransactionRow';
-import { colors, radii, spacing } from '@/constants/theme';
-import { mockMonthlySummary, mockTransactions } from '@/data/mockTransactions';
+import { Box } from '@/components/ui/box';
+import { FadeSlideIn } from '@/components/ui/FadeSlideIn';
+import { SafeAreaView } from '@/components/ui/safe-area-view';
+import { ScrollView } from '@/components/ui/scroll-view';
+import { Text } from '@/components/ui/text';
+import { mockMonthlySummary } from '@/data/mockTransactions';
+import { useTransactionStore } from '@/store/useTransactionStore';
+
+// Caps the stagger so a long, freshly-imported list doesn't take forever to
+// finish cascading in — later rows just join at the same final beat.
+const MAX_STAGGERED_ROWS = 8;
+const ROW_STAGGER_MS = 45;
 
 export default function HomeScreen() {
+  const transactions = useTransactionStore((state) => state.transactions);
+  const tabBarHeight = useBottomTabBarHeight();
+  const router = useRouter();
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.greeting}>Welcome back</Text>
-          <Text style={styles.title}>Your finances</Text>
-        </View>
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: tabBarHeight + 24 }} showsVerticalScrollIndicator={false}>
+        <FadeSlideIn className="mb-6">
+          <Text className="font-body text-sm text-muted-foreground">Welcome back</Text>
+          <Text className="mt-0.5 font-display-bold text-[30px] tracking-[-0.6px] text-foreground">Your finances</Text>
+        </FadeSlideIn>
 
-        <MonthSummaryCard summary={mockMonthlySummary} />
+        <FadeSlideIn delay={60}>
+          <MonthSummaryCard summary={mockMonthlySummary} />
+        </FadeSlideIn>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent transactions</Text>
-        </View>
+        <FadeSlideIn delay={140} className="mb-2 mt-8">
+          <Text className="font-body-semibold text-base text-foreground">Recent transactions</Text>
+        </FadeSlideIn>
 
-        <View style={styles.transactionList}>
-          {mockTransactions.map((transaction, index) => (
-            <View key={transaction.id}>
-              {index > 0 && <View style={styles.separator} />}
-              <TransactionRow transaction={transaction} />
-            </View>
+        <Box className="rounded-lg border border-border bg-card px-4">
+          {transactions.map((transaction, index) => (
+            <FadeSlideIn key={transaction.id} delay={180 + Math.min(index, MAX_STAGGERED_ROWS) * ROW_STAGGER_MS}>
+              {index > 0 && <Box className="h-px bg-border" />}
+              <TransactionRow
+                transaction={transaction}
+                onPress={() => router.push(`/transactions/${transaction.id}`)}
+              />
+            </FadeSlideIn>
           ))}
-        </View>
+        </Box>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  header: {
-    marginBottom: spacing.lg,
-  },
-  greeting: {
-    fontSize: 14,
-    color: colors.textMuted,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginTop: 2,
-  },
-  sectionHeader: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  transactionList: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: colors.border,
-  },
-});

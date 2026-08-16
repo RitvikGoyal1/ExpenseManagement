@@ -8,6 +8,33 @@ export type TransactionCategory =
   | 'Income'
   | 'Other';
 
+/** Labels shown when a transaction is manually or automatically flagged deductible. */
+export type DeductionCategory =
+  | 'Business Expense'
+  | 'Home Office'
+  | 'Travel'
+  | 'Software & Subscriptions'
+  | 'Other';
+
+export const DEDUCTION_CATEGORIES: DeductionCategory[] = [
+  'Business Expense',
+  'Home Office',
+  'Travel',
+  'Software & Subscriptions',
+  'Other',
+];
+
+export const TRANSACTION_CATEGORIES: TransactionCategory[] = [
+  'Food & Dining',
+  'Transport',
+  'Shopping',
+  'Bills & Utilities',
+  'Entertainment',
+  'Health',
+  'Income',
+  'Other',
+];
+
 export interface Transaction {
   id: string;
   merchant: string;
@@ -16,6 +43,10 @@ export interface Transaction {
   amount: number;
   /** ISO 8601 date string. */
   date: string;
+  /** Whether this is a potential tax deduction — AI-flagged or user-corrected. */
+  isDeductible: boolean;
+  /** Only meaningful when isDeductible is true. */
+  deductionCategory?: DeductionCategory;
 }
 
 export interface MonthlySummary {
