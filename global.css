@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import 'uniwind';
+@import "uniwind";
 
 /*
  * "Daybook" — a single, deliberately light-only identity (see the
@@ -109,14 +109,14 @@
   /* Custom fonts must be selected by family name alone, never combined with
      font-weight (React Native can't synthesize a bold on top of a weight-
      specific font file) — so each weight we use gets its own family token. */
-  --font-display: 'SpaceGrotesk-Medium';
-  --font-display-semibold: 'SpaceGrotesk-SemiBold';
-  --font-display-bold: 'SpaceGrotesk-Bold';
-  --font-body: 'Inter-Regular';
-  --font-body-medium: 'Inter-Medium';
-  --font-body-semibold: 'Inter-SemiBold';
-  --font-body-bold: 'Inter-Bold';
-  --font-mono: 'JetBrainsMono-Regular';
-  --font-mono-medium: 'JetBrainsMono-Medium';
-  --font-mono-semibold: 'JetBrainsMono-SemiBold';
+  --font-display: "SpaceGrotesk-Medium";
+  --font-display-semibold: "SpaceGrotesk-SemiBold";
+  --font-display-bold: "SpaceGrotesk-Bold";
+  --font-body: "Inter-Regular";
+  --font-body-medium: "Inter-Medium";
+  --font-body-semibold: "Inter-SemiBold";
+  --font-body-bold: "Inter-Bold";
+  --font-mono: "JetBrainsMono-Regular";
+  --font-mono-medium: "JetBrainsMono-Medium";
+  --font-mono-semibold: "JetBrainsMono-SemiBold";
 }
