@@ -36,28 +36,8 @@ export const mockBalanceSheet: BalanceSheet = {
 };
 
 export const mockQuickPrompts: QuickPrompt[] = [
-  {
-    id: 'savings-rate',
-    question: 'What is my savings rate?',
-    insight:
-      "Your savings rate is ~40% this month — you kept $2,830 of the $7,050 you earned. That's well above the 20% benchmark most planners recommend.",
-  },
-  {
-    id: 'food-spending',
-    question: 'Analyze my food spending',
-    insight:
-      'Food spending is $850 this month, about 20% of total expenses. It ranks second behind Housing, which alone accounts for 52% of total expenses.',
-  },
-  {
-    id: 'net-worth',
-    question: 'Net worth summary',
-    insight:
-      'Your net worth is $127,500 — $427,000 in assets against $299,500 in liabilities, for an asset-to-debt ratio of roughly 1.4x.',
-  },
-  {
-    id: 'cut-back',
-    question: 'Where can I cut back?',
-    insight:
-      'Entertainment ($400) and Utilities ($320) together make up 17% of spending. Trimming discretionary entertainment by half would add about $200/month back to savings.',
-  },
+  { id: 'savings-rate', question: 'What is my savings rate?' },
+  { id: 'food-spending', question: 'Analyze my food spending' },
+  { id: 'net-worth', question: 'Net worth summary' },
+  { id: 'cut-back', question: 'Where can I cut back?' },
 ];

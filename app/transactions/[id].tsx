@@ -90,20 +90,23 @@ export default function TransactionDetailScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <Header onBack={() => router.back()} title="Transaction Details" />
 
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={12}>
-        <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={12}>
+        <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
           <Box className="items-center rounded-lg border border-border bg-card py-4">
             <Text className="mb-2 font-mono text-[11px] tracking-[1px] text-muted-foreground">AMOUNT</Text>
             <Box className="flex-row items-center">
               <Text className={`mr-0.5 font-display-bold text-[34px] ${isIncome ? 'text-income' : 'text-foreground'}`}>$</Text>
-              <InputField
-                className={`min-w-[120px] p-0 text-center font-display-bold text-[40px] tracking-[-1px] ${isIncome ? 'text-income' : 'text-foreground'}`}
-                value={amountText}
-                onChangeText={setAmountText}
-                keyboardType="numbers-and-punctuation"
-                placeholder="0.00"
-                placeholderTextColor={colors.textMuted}
-              />
+              <Input className="min-h-0 w-auto border-0 bg-transparent px-0 shadow-none">
+                <InputField
+                  className={`w-[200px] flex-none p-0 text-center font-display-bold ${isIncome ? 'text-income' : 'text-foreground'}`}
+                  style={{ fontSize: 40, letterSpacing: -1 }}
+                  value={amountText}
+                  onChangeText={setAmountText}
+                  keyboardType="numbers-and-punctuation"
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </Input>
             </Box>
             <Text className="mt-2 font-body text-[11px] text-muted-foreground">Use a negative value for expenses, positive for income.</Text>
           </Box>

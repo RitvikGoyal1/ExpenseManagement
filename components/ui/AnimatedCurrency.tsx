@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react';
-import { InteractionManager } from 'react-native';
-import { runOnJS, useAnimatedReaction, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
+import { useEffect, useRef, useState } from 'react';
 
 import { Text } from '@/components/ui/text';
-import { springs } from '@/constants/motion';
 import { formatCurrency } from '@/utils/format';
 
 interface AnimatedCurrencyProps extends React.ComponentProps<typeof Text> {
@@ -11,29 +8,59 @@ interface AnimatedCurrencyProps extends React.ComponentProps<typeof Text> {
   delay?: number;
 }
 
-/** Text that springs from 0 up to `value`, counting up as it settles. */
+const DURATION_MS = 400;
+
+// No-overshoot ease-out, matching the feel of the critically-damped spring
+// (dampingRatio: 1) this used to run on Reanimated's UI thread.
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3;
+}
+
+/**
+ * Text that counts up from 0 to `value` on a settling ease-out curve.
+ *
+ * Deliberately plain JS (rAF + setState), not Reanimated. This used to run
+ * the count-up as a shared value and sync it to text via
+ * `useAnimatedReaction` + `runOnJS`, but that cross-thread call is exactly
+ * the pattern implicated in several open react-native-worklets crash
+ * reports (use-after-free in `scheduleOnRN`/`runOnJS` when components
+ * mount/unmount quickly during a screen transition — see
+ * software-mansion/react-native-reanimated#9776, #1548). This component
+ * mounts for the first time in exactly that situation (right as onboarding
+ * hard-swaps into the tab navigator), so it stays off the UI thread.
+ */
 export function AnimatedCurrency({ value, delay = 0, style, ...rest }: AnimatedCurrencyProps) {
-  const animated = useSharedValue(0);
   const [display, setDisplay] = useState(() => formatCurrency(0));
+  const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Deferred so this doesn't compete with an in-flight navigator
-    // transition for the UI thread (see FadeSlideIn for the same reasoning).
-    const task = InteractionManager.runAfterInteractions(() => {
-      animated.value = withDelay(delay, withSpring(value, springs.default));
-    });
-    return () => task.cancel();
+    let start: number | null = null;
+
+    function tick(timestamp: number) {
+      if (start === null) {
+        start = timestamp;
+      }
+      const progress = Math.min((timestamp - start) / DURATION_MS, 1);
+      setDisplay(formatCurrency(easeOutCubic(progress) * value));
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(tick);
+      }
+    }
+
+    const timeoutId = setTimeout(() => {
+      frameRef.current = requestAnimationFrame(tick);
+    }, delay);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
     // Runs whenever the target value itself changes (e.g. new transaction),
     // not on every re-render — `delay` is only the initial stagger offset.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
-
-  useAnimatedReaction(
-    () => animated.value,
-    (current) => {
-      runOnJS(setDisplay)(formatCurrency(current));
-    },
-  );
 
   return (
     <Text style={style} {...rest}>

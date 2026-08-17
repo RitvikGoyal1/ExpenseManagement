@@ -22,7 +22,12 @@ export default function AnalyticsScreen() {
         </FadeSlideIn>
 
         <FadeSlideIn delay={60}>
-          <AiWidget prompts={mockQuickPrompts} />
+          <AiWidget
+            prompts={mockQuickPrompts}
+            spendingCategories={mockSpendingCategories}
+            cashFlow={mockCashFlow}
+            balanceSheet={mockBalanceSheet}
+          />
         </FadeSlideIn>
 
         <FadeSlideIn delay={120} className="mt-6">

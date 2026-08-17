@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, InteractionManager } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -73,9 +73,14 @@ export default function ImportScreen() {
     // Populates the dashboard, then flips the onboarding flag — the root
     // layout's Stack.Protected guard reacts to that and swaps the whole
     // onboarding stack out for the main tabs, so this screen and its
-    // history are gone, not just navigated past.
-    importTransactions(transactions);
-    completeOnboarding();
+    // history are gone, not just navigated past (not a normal push/pop).
+    // Deferred a beat via InteractionManager so that hard swap doesn't land
+    // in the same frame as this screen's own settling animations — see
+    // FadeSlideIn for the same reasoning on the receiving end.
+    InteractionManager.runAfterInteractions(() => {
+      importTransactions(transactions);
+      completeOnboarding();
+    });
   }, [completeOnboarding, importTransactions, isSyncing]);
 
   return (
@@ -157,7 +162,10 @@ function DoneCheckmark() {
   const pop = useSharedValue(0);
 
   useEffect(() => {
-    pop.value = withSpring(1, springs.bouncy);
+    const task = InteractionManager.runAfterInteractions(() => {
+      pop.value = withSpring(1, springs.bouncy);
+    });
+    return () => task.cancel();
   }, [pop]);
 
   const popStyle = useAnimatedStyle(() => ({

@@ -1,5 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 
 import { Transaction } from '@/types/transaction';
 
@@ -42,6 +43,21 @@ export function buildTransactionsCsv(transactions: Transaction[]): string {
  */
 export async function generateAndShareCSV(transactions: Transaction[], fileName = 'Tax_Export.csv'): Promise<void> {
   const csv = buildTransactionsCsv(transactions);
+
+  if (Platform.OS === 'web') {
+    // expo-file-system and expo-sharing aren't available on web, so hand the
+    // file off through the browser's own download flow instead.
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    return;
+  }
 
   const file = new File(Paths.document, fileName);
   file.create({ overwrite: true });

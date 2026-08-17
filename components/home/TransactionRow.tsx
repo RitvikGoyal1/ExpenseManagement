@@ -42,7 +42,7 @@ export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
 
       <Box className="flex-1">
         <Box className="flex-row items-center">
-          <Text className="font-body-semibold text-[15px] text-foreground" numberOfLines={1}>
+          <Text className="font-body-semibold text-[15px] text-foreground" isTruncated>
             {merchant}
           </Text>
           {isDeductible && (

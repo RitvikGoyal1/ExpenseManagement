@@ -34,5 +34,10 @@ export interface BalanceSheet {
 export interface QuickPrompt {
   id: string;
   question: string;
-  insight: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'ai';
+  text: string;
 }

@@ -15,7 +15,6 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { springs } from '@/constants/motion';
 import { colors } from '@/constants/theme';
-import { ParsedReceiptData } from '@/services/ocrService';
 import {
   DEDUCTION_CATEGORIES,
   DeductionCategory,
@@ -33,31 +32,30 @@ const DISMISS_VELOCITY = 800;
 const RUBBER_BAND_DIMENSION = 60;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
+type TransactionType = 'expense' | 'income';
+
+// "Income" is its own category (forced below), not a pickable expense bucket.
+const EXPENSE_CATEGORIES = TRANSACTION_CATEGORIES.filter((option) => option !== 'Income');
+
 function rubberband(overshoot: number, dimension: number, constant = 0.55) {
   'worklet';
   return (overshoot * dimension * constant) / (dimension + constant * Math.abs(overshoot));
 }
 
-interface ReceiptConfirmationModalProps {
+interface ManualTransactionModalProps {
   visible: boolean;
-  /** The OCR's best guess — null when OCR failed entirely, so every field opens blank for manual entry. */
-  initialData: ParsedReceiptData | null;
   onCancel: () => void;
   onConfirm: (transaction: Transaction) => void;
 }
 
 /**
  * A hand-built spring/gesture bottom sheet (same construction as
- * AiInsightSheet) rather than the platform Modal slide: draggable with 1:1
- * tracking, rubber-bands against its own top edge, and snaps back or
- * dismisses using release velocity — never a fixed-duration slide.
- *
- * The receipt is never trusted blind: this is the review step between OCR's
- * guess and the ledger. Every field is pre-filled but editable, and if OCR
- * came back empty (blurry photo, API down), the fields just open blank —
- * the same form, filled in by hand instead of by machine.
+ * ReceiptConfirmationModal / AiInsightSheet) for entering a transaction with
+ * no photo involved — the "I paid cash" / "I got paid" path. Unlike the
+ * receipt flow, which is always an expense, this one opens with an
+ * expense/income switch since either direction is a normal manual entry.
  */
-export function ReceiptConfirmationModal({ visible, initialData, onCancel, onConfirm }: ReceiptConfirmationModalProps) {
+export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualTransactionModalProps) {
   const translateY = useSharedValue(HIDDEN_OFFSET);
   const hasCrossedThreshold = useSharedValue(false);
   // Not KeyboardAvoidingView — this sheet lives inside a Modal with a transform-driven position,
@@ -66,6 +64,7 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
   // measurement entirely.
   const keyboardHeight = useKeyboardHeight();
 
+  const [type, setType] = useState<TransactionType>('expense');
   const [merchant, setMerchant] = useState('');
   const [amountText, setAmountText] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString());
@@ -77,19 +76,19 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
     if (!visible) {
       return;
     }
-    // Re-seed every field from the latest OCR guess (or blank) each time
-    // the sheet opens for a new receipt.
-    setMerchant(initialData?.merchant ?? '');
-    setAmountText(initialData && initialData.amount > 0 ? initialData.amount.toFixed(2) : '');
-    setDate(initialData?.date ?? new Date().toISOString());
-    setCategory(initialData?.category ?? 'Other');
-    setIsDeductible(initialData?.isTaxDeductible ?? false);
-    setDeductionCategory(initialData?.isTaxDeductible ? 'Business Expense' : undefined);
+    // Every field opens blank — this is manual entry, there's no OCR guess to seed from.
+    setType('expense');
+    setMerchant('');
+    setAmountText('');
+    setDate(new Date().toISOString());
+    setCategory('Other');
+    setIsDeductible(false);
+    setDeductionCategory(undefined);
 
     translateY.value = HIDDEN_OFFSET;
     translateY.value = withSpring(0, springs.sheet);
     hasCrossedThreshold.value = false;
-  }, [visible, initialData, translateY, hasCrossedThreshold]);
+  }, [visible, translateY, hasCrossedThreshold]);
 
   const notifyThresholdCrossed = useCallback(() => {
     haptics.impact(Haptics.ImpactFeedbackStyle.Light);
@@ -155,6 +154,21 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
     setDate(new Date(new Date(date).getTime() + direction * ONE_DAY_MS).toISOString());
   };
 
+  const handleSelectType = (next: TransactionType) => {
+    if (next === type) {
+      return;
+    }
+    haptics.selection();
+    setType(next);
+    if (next === 'income') {
+      setCategory('Income');
+      setIsDeductible(false);
+      setDeductionCategory(undefined);
+    } else {
+      setCategory('Other');
+    }
+  };
+
   const handleToggleDeductible = (value: boolean) => {
     haptics.impact();
     setIsDeductible(value);
@@ -166,20 +180,24 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
   const handleConfirm = () => {
     const parsedAmount = Number(amountText);
     const magnitude = Number.isFinite(parsedAmount) ? Math.abs(parsedAmount) : 0;
+    const isIncome = type === 'income';
 
     const transaction: Transaction = {
       id: `txn_${Date.now()}`,
-      merchant: merchant.trim() || 'Unknown Merchant',
+      merchant: merchant.trim() || (isIncome ? 'Unknown Source' : 'Unknown Merchant'),
       category,
-      amount: -magnitude, // a scanned receipt is always an expense
+      amount: isIncome ? magnitude : -magnitude,
       date,
-      isDeductible,
-      deductionCategory: isDeductible ? deductionCategory : undefined,
+      isDeductible: !isIncome && isDeductible,
+      deductionCategory: !isIncome && isDeductible ? deductionCategory : undefined,
     };
 
     haptics.success();
     animateClosed(0, () => onConfirm(transaction));
   };
+
+  const isIncome = type === 'income';
+  const tintColor = isIncome ? colors.income : colors.expense;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={() => animateClosed()}>
@@ -215,13 +233,11 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
 
                   <Box className="mb-2 flex-row items-center">
                     <Box className="mr-2 h-8 w-8 items-center justify-center rounded-full bg-primary/16">
-                      <Ionicons name="receipt-outline" size={16} color={colors.primary} />
+                      <Ionicons name="create-outline" size={16} color={colors.primary} />
                     </Box>
                     <Box className="flex-1">
-                      <Text className="font-display-semibold text-base text-foreground">Confirm Receipt</Text>
-                      <Text className="font-body text-xs text-muted-foreground">
-                        {initialData ? 'Review what we read — fix anything that looks off' : "We couldn't read this one — fill it in"}
-                      </Text>
+                      <Text className="font-display-semibold text-base text-foreground">Add Transaction</Text>
+                      <Text className="font-body text-xs text-muted-foreground">Enter the details by hand</Text>
                     </Box>
                     <AnimatedPressable onPress={() => animateClosed()} hitSlop={8} scaleTo={0.85}>
                       <Ionicons name="close" size={22} color={colors.textMuted} />
@@ -230,13 +246,32 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
                 </Box>
 
                 <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
-                  <Box>
-                    <Text className="mb-1.5 font-mono text-[11px] tracking-[1px] text-muted-foreground">VENDOR</Text>
+                  <Box className="flex-row gap-2 rounded-lg bg-muted p-1">
+                    <TypeSegment
+                      label="Expense"
+                      icon="arrow-down-circle"
+                      selected={type === 'expense'}
+                      color={colors.expense}
+                      onPress={() => handleSelectType('expense')}
+                    />
+                    <TypeSegment
+                      label="Income"
+                      icon="arrow-up-circle"
+                      selected={type === 'income'}
+                      color={colors.income}
+                      onPress={() => handleSelectType('income')}
+                    />
+                  </Box>
+
+                  <Box className="mt-4">
+                    <Text className="mb-1.5 font-mono text-[11px] tracking-[1px] text-muted-foreground">
+                      {isIncome ? 'SOURCE' : 'MERCHANT'}
+                    </Text>
                     <Input className="rounded-md border border-border bg-card px-4 py-3">
                       <InputField
                         value={merchant}
                         onChangeText={setMerchant}
-                        placeholder="Merchant name"
+                        placeholder={isIncome ? 'e.g. Paycheck, Client payment' : 'Merchant name'}
                         placeholderTextColor={colors.textMuted}
                       />
                     </Input>
@@ -245,9 +280,12 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
                   <Box className="mt-4">
                     <Text className="mb-1.5 font-mono text-[11px] tracking-[1px] text-muted-foreground">AMOUNT</Text>
                     <Input className="flex-row items-center rounded-md border border-border bg-card px-4 py-3">
-                      <Text className="mr-1 font-body-semibold text-[15px] text-foreground">$</Text>
+                      <Text className="mr-1 font-body-semibold text-[15px]" style={{ color: tintColor }}>
+                        $
+                      </Text>
                       <InputField
                         className="p-0"
+                        style={{ color: tintColor }}
                         value={amountText}
                         onChangeText={setAmountText}
                         keyboardType="numbers-and-punctuation"
@@ -280,47 +318,51 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
                     </Box>
                   </Box>
 
-                  <Box className="mt-4">
-                    <Text className="mb-1.5 font-mono text-[11px] tracking-[1px] text-muted-foreground">CATEGORY</Text>
-                    <Box className="flex-row flex-wrap gap-2">
-                      {TRANSACTION_CATEGORIES.map((option) => (
-                        <Chip key={option} label={option} selected={option === category} onPress={() => setCategory(option)} />
-                      ))}
-                    </Box>
-                  </Box>
-
-                  <Box className="mt-4 gap-3 rounded-lg border border-border bg-card p-3.5">
-                    <Box className="flex-row items-center">
-                      <Box className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-gold/16">
-                        <Ionicons name="document-text-outline" size={18} color={colors.gold} />
-                      </Box>
-                      <Box className="mr-2 flex-1">
-                        <Text className="font-body-semibold text-[14px] text-foreground">Tax Deductible</Text>
-                        <Text className="mt-0.5 font-body text-[11px] text-muted-foreground">Flag as a business expense</Text>
-                      </Box>
-                      <Switch
-                        value={isDeductible}
-                        onValueChange={handleToggleDeductible}
-                        trackColor={{ false: colors.border, true: colors.goldSoft }}
-                        thumbColor={isDeductible ? colors.gold : colors.textMuted}
-                        ios_backgroundColor={colors.border}
-                      />
-                    </Box>
-
-                    {isDeductible && (
+                  {!isIncome && (
+                    <Box className="mt-4">
+                      <Text className="mb-1.5 font-mono text-[11px] tracking-[1px] text-muted-foreground">CATEGORY</Text>
                       <Box className="flex-row flex-wrap gap-2">
-                        {DEDUCTION_CATEGORIES.map((option) => (
-                          <Chip
-                            key={option}
-                            label={option}
-                            selected={option === deductionCategory}
-                            onPress={() => setDeductionCategory(option)}
-                            tint="gold"
-                          />
+                        {EXPENSE_CATEGORIES.map((option) => (
+                          <Chip key={option} label={option} selected={option === category} onPress={() => setCategory(option)} />
                         ))}
                       </Box>
-                    )}
-                  </Box>
+                    </Box>
+                  )}
+
+                  {!isIncome && (
+                    <Box className="mt-4 gap-3 rounded-lg border border-border bg-card p-3.5">
+                      <Box className="flex-row items-center">
+                        <Box className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-gold/16">
+                          <Ionicons name="document-text-outline" size={18} color={colors.gold} />
+                        </Box>
+                        <Box className="mr-2 flex-1">
+                          <Text className="font-body-semibold text-[14px] text-foreground">Tax Deductible</Text>
+                          <Text className="mt-0.5 font-body text-[11px] text-muted-foreground">Flag as a business expense</Text>
+                        </Box>
+                        <Switch
+                          value={isDeductible}
+                          onValueChange={handleToggleDeductible}
+                          trackColor={{ false: colors.border, true: colors.goldSoft }}
+                          thumbColor={isDeductible ? colors.gold : colors.textMuted}
+                          ios_backgroundColor={colors.border}
+                        />
+                      </Box>
+
+                      {isDeductible && (
+                        <Box className="flex-row flex-wrap gap-2">
+                          {DEDUCTION_CATEGORIES.map((option) => (
+                            <Chip
+                              key={option}
+                              label={option}
+                              selected={option === deductionCategory}
+                              onPress={() => setDeductionCategory(option)}
+                              tint="gold"
+                            />
+                          ))}
+                        </Box>
+                      )}
+                    </Box>
+                  )}
                 </ScrollView>
 
                 <Box className="flex-row gap-3 px-6 pb-8 pt-4">
@@ -331,11 +373,17 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
                     <Text className="font-body-semibold text-[15px] text-foreground">Cancel</Text>
                   </AnimatedPressable>
                   <AnimatedPressable
-                    className="flex-[1.4] items-center rounded-lg bg-primary py-3.5"
-                    style={{ shadowColor: colors.primary, shadowRadius: 12, shadowOpacity: 0.22, shadowOffset: { width: 0, height: 4 } }}
+                    className="flex-[1.4] items-center rounded-lg py-3.5"
+                    style={{
+                      backgroundColor: tintColor,
+                      shadowColor: tintColor,
+                      shadowRadius: 12,
+                      shadowOpacity: 0.22,
+                      shadowOffset: { width: 0, height: 4 },
+                    }}
                     onPress={handleConfirm}
                   >
-                    <Text className="font-body-bold text-[15px] text-glass">Confirm & Save</Text>
+                    <Text className="font-body-bold text-[15px] text-glass">{isIncome ? 'Add Income' : 'Add Expense'}</Text>
                   </AnimatedPressable>
                 </Box>
               </Animated.View>
@@ -344,6 +392,28 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
         </Box>
       </GestureHandlerRootView>
     </Modal>
+  );
+}
+
+interface TypeSegmentProps {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  selected: boolean;
+  color: string;
+  onPress: () => void;
+}
+
+function TypeSegment({ label, icon, selected, color, onPress }: TypeSegmentProps) {
+  return (
+    <GluePressable
+      onPress={onPress}
+      className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-md py-2.5 ${selected ? 'bg-card' : ''}`}
+    >
+      <Ionicons name={icon} size={16} color={selected ? color : colors.textMuted} />
+      <Text className="font-body-semibold text-[14px]" style={{ color: selected ? color : colors.textMuted }}>
+        {label}
+      </Text>
+    </GluePressable>
   );
 }
 

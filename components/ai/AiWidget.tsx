@@ -7,14 +7,17 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
 import { cardShadow, colors } from '@/constants/theme';
-import { QuickPrompt } from '@/types/analytics';
+import { BalanceSheet, CashFlowSummary, QuickPrompt, SpendingCategory } from '@/types/analytics';
 import { haptics } from '@/utils/haptics';
 
 interface AiWidgetProps {
   prompts: QuickPrompt[];
+  spendingCategories: SpendingCategory[];
+  cashFlow: CashFlowSummary;
+  balanceSheet: BalanceSheet;
 }
 
-export function AiWidget({ prompts }: AiWidgetProps) {
+export function AiWidget({ prompts, spendingCategories, cashFlow, balanceSheet }: AiWidgetProps) {
   const [activePrompt, setActivePrompt] = useState<QuickPrompt | null>(null);
 
   const handlePromptPress = useCallback((prompt: QuickPrompt) => {
@@ -56,7 +59,13 @@ export function AiWidget({ prompts }: AiWidgetProps) {
         </Box>
       </LinearGradient>
 
-      <AiInsightSheet prompt={activePrompt} onClose={() => setActivePrompt(null)} />
+      <AiInsightSheet
+        prompt={activePrompt}
+        onClose={() => setActivePrompt(null)}
+        spendingCategories={spendingCategories}
+        cashFlow={cashFlow}
+        balanceSheet={balanceSheet}
+      />
     </>
   );
 }

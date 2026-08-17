@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { LayoutChangeEvent } from "react-native";
+import { LayoutChangeEvent, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 
 import { Box } from "@/components/ui/box";
@@ -40,6 +40,10 @@ export function CashFlowChart({ cashFlow }: CashFlowChartProps) {
   // inside this card — that mismatch is what was overflowing the card.
   const barWidth = chartWidth * 0.26;
   const barGap = chartWidth > 0 ? (chartWidth - barWidth * 2) / 3 : 0;
+
+  // Headroom above the tallest bar so its topLabelComponent (the $ amount) has room to render —
+  // without this, the tallest bar reaches the very top of the chart's `height` and clips its own label.
+  const maxChartValue = Math.max(cashFlow.totalIncome, cashFlow.totalOutflow) * 1.25;
 
   const incomeColor =
     selectedBar === null || selectedBar === "income"
@@ -99,34 +103,37 @@ export function CashFlowChart({ cashFlow }: CashFlowChartProps) {
         {cashFlow.month} · tap a bar for details
       </Text>
 
-      <Box className="mt-6" onLayout={handleLayout}>
-        {chartWidth > 0 && (
-          <BarChart
-            data={barData}
-            width={chartWidth}
-            height={150}
-            barWidth={barWidth}
-            spacing={barGap}
-            initialSpacing={barGap}
-            endSpacing={barGap}
-            isAnimated
-            animationDuration={650}
-            disableScroll
-            roundedTop
-            barBorderRadius={10}
-            hideRules
-            hideYAxisText
-            yAxisLabelWidth={0}
-            yAxisThickness={0}
-            xAxisThickness={0}
-            xAxisLabelTextStyle={{
-              fontFamily: "JetBrainsMono-Medium",
-              fontSize: 11,
-              color: colors.textMuted,
-            }}
-            noOfSections={4}
-          />
-        )}
+      <Box className="mt-6">
+        <View onLayout={handleLayout}>
+          {chartWidth > 0 && (
+            <BarChart
+              data={barData}
+              width={chartWidth}
+              height={150}
+              maxValue={maxChartValue}
+              barWidth={barWidth}
+              spacing={barGap}
+              initialSpacing={barGap}
+              endSpacing={barGap}
+              isAnimated
+              animationDuration={650}
+              disableScroll
+              roundedTop
+              barBorderRadius={10}
+              hideRules
+              hideYAxisText
+              yAxisLabelWidth={0}
+              yAxisThickness={0}
+              xAxisThickness={0}
+              xAxisLabelTextStyle={{
+                fontFamily: "JetBrainsMono-Medium",
+                fontSize: 11,
+                color: colors.textMuted,
+              }}
+              noOfSections={4}
+            />
+          )}
+        </View>
       </Box>
 
       {selectedBar ? (
