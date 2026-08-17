@@ -1,24 +1,24 @@
-import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { Box } from '@/components/ui/box';
-import { Text } from '@/components/ui/text';
-import { colors } from '@/constants/theme';
-import { Transaction, TransactionCategory } from '@/types/transaction';
-import { formatCurrency, formatShortDate } from '@/utils/format';
+import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
+import { Box } from "@/components/ui/box";
+import { Text } from "@/components/ui/text";
+import { colors } from "@/constants/theme";
+import { Transaction, TransactionCategory } from "@/types/transaction";
+import { formatCurrency, formatShortDate } from "@/utils/format";
 
-type IconName = ComponentProps<typeof Ionicons>['name'];
+type IconName = ComponentProps<typeof Ionicons>["name"];
 
 const CATEGORY_ICON: Record<TransactionCategory, IconName> = {
-  'Food & Dining': 'fast-food-outline',
-  Transport: 'car-outline',
-  Shopping: 'bag-outline',
-  'Bills & Utilities': 'flash-outline',
-  Entertainment: 'film-outline',
-  Health: 'medkit-outline',
-  Income: 'arrow-down-circle-outline',
-  Other: 'ellipsis-horizontal-circle-outline',
+  "Food & Dining": "fast-food-outline",
+  Transport: "car-outline",
+  Shopping: "bag-outline",
+  "Bills & Utilities": "flash-outline",
+  Entertainment: "film-outline",
+  Health: "medkit-outline",
+  Income: "arrow-down-circle-outline",
+  Other: "ellipsis-horizontal-circle-outline",
 };
 
 interface TransactionRowProps {
@@ -31,8 +31,14 @@ export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
   const isIncome = amount > 0;
 
   return (
-    <AnimatedPressable className="flex-row items-center py-3" scaleTo={0.98} onPress={onPress}>
-      <Box className={`mr-4 h-10 w-10 items-center justify-center rounded-md ${isIncome ? 'bg-income/16' : 'bg-popover'}`}>
+    <AnimatedPressable
+      className="flex-row items-center py-3"
+      scaleTo={0.98}
+      onPress={onPress}
+    >
+      <Box
+        className={`mr-4 h-10 w-10 items-center justify-center rounded-md ${isIncome ? "bg-income/16" : "bg-popover"}`}
+      >
         <Ionicons
           name={CATEGORY_ICON[category]}
           size={18}
@@ -42,7 +48,10 @@ export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
 
       <Box className="flex-1">
         <Box className="flex-row items-center">
-          <Text className="font-body-semibold text-[15px] text-foreground" isTruncated>
+          <Text
+            className="font-body-semibold text-[15px] text-foreground"
+            isTruncated
+          >
             {merchant}
           </Text>
           {isDeductible && (
@@ -56,8 +65,10 @@ export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
         </Text>
       </Box>
 
-      <Text className={`ml-2 font-mono-semibold text-[15px] ${isIncome ? 'text-income' : 'text-foreground'}`}>
-        {isIncome ? '+' : ''}
+      <Text
+        className={`ml-2 font-mono-semibold text-[15px] ${isIncome ? "text-income" : "text-foreground"}`}
+      >
+        {isIncome ? "+" : ""}
         {formatCurrency(amount)}
       </Text>
     </AnimatedPressable>

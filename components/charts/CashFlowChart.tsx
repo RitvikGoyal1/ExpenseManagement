@@ -43,7 +43,8 @@ export function CashFlowChart({ cashFlow }: CashFlowChartProps) {
 
   // Headroom above the tallest bar so its topLabelComponent (the $ amount) has room to render —
   // without this, the tallest bar reaches the very top of the chart's `height` and clips its own label.
-  const maxChartValue = Math.max(cashFlow.totalIncome, cashFlow.totalOutflow) * 1.25;
+  const maxChartValue =
+    Math.max(cashFlow.totalIncome, cashFlow.totalOutflow) * 1.25;
 
   const incomeColor =
     selectedBar === null || selectedBar === "income"

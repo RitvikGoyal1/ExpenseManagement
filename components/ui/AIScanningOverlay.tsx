@@ -1,32 +1,32 @@
-import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withRepeat,
+    withSequence,
+    withTiming,
+} from "react-native-reanimated";
 
-import { Box } from '@/components/ui/box';
-import { Text } from '@/components/ui/text';
-import { colors } from '@/constants/theme';
-import { haptics } from '@/utils/haptics';
+import { Box } from "@/components/ui/box";
+import { Text } from "@/components/ui/text";
+import { colors } from "@/constants/theme";
+import { haptics } from "@/utils/haptics";
 
 // Fabricated but plausible — mirrors the real extraction Gemini performs in
 // ocrService (vendor, total, category, tax deductibility) so the copy reads
 // as truthful narration rather than a generic spinner label.
 const STEPS = [
-  'Scanning receipt with AI vision',
-  'Reading vendor & total',
-  'Detecting spending category',
-  'Checking tax deductibility',
-  'Finalizing entry',
+  "Scanning receipt with AI vision",
+  "Reading vendor & total",
+  "Detecting spending category",
+  "Checking tax deductibility",
+  "Finalizing entry",
 ] as const;
 
 const STEP_INTERVAL_MS = 1150;
@@ -51,13 +51,38 @@ export function AIScanningOverlay() {
   const ringB = useSharedValue(0);
 
   useEffect(() => {
-    sweep.value = withRepeat(withTiming(1, { duration: SWEEP_DURATION_MS, easing: Easing.inOut(Easing.sin) }), -1, true);
-    pulse.value = withRepeat(withSequence(withTiming(1, { duration: 1000 }), withTiming(0, { duration: 1000 })), -1, false);
-    ringA.value = withRepeat(withTiming(1, { duration: 1800, easing: Easing.out(Easing.ease) }), -1, false);
+    sweep.value = withRepeat(
+      withTiming(1, {
+        duration: SWEEP_DURATION_MS,
+        easing: Easing.inOut(Easing.sin),
+      }),
+      -1,
+      true,
+    );
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1000 }),
+        withTiming(0, { duration: 1000 }),
+      ),
+      -1,
+      false,
+    );
+    ringA.value = withRepeat(
+      withTiming(1, { duration: 1800, easing: Easing.out(Easing.ease) }),
+      -1,
+      false,
+    );
     // Delayed start only offsets the first cycle, staggering ringB half a
     // period behind ringA for a continuous alternating "radar ping" instead
     // of both rings pulsing in lockstep.
-    ringB.value = withDelay(900, withRepeat(withTiming(1, { duration: 1800, easing: Easing.out(Easing.ease) }), -1, false));
+    ringB.value = withDelay(
+      900,
+      withRepeat(
+        withTiming(1, { duration: 1800, easing: Easing.out(Easing.ease) }),
+        -1,
+        false,
+      ),
+    );
   }, [sweep, pulse, ringA, ringB]);
 
   useEffect(() => {
@@ -69,7 +94,10 @@ export function AIScanningOverlay() {
         }
         return;
       }
-      textOpacity.value = withSequence(withTiming(0, { duration: 150 }), withTiming(1, { duration: 280 }));
+      textOpacity.value = withSequence(
+        withTiming(0, { duration: 150 }),
+        withTiming(1, { duration: 280 }),
+      );
       // Swap the label once it's fully faded out, not mid-fade.
       setTimeout(() => {
         step += 1;
@@ -87,7 +115,12 @@ export function AIScanningOverlay() {
   }, []);
 
   const sweepStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: sweep.value * Math.max(containerHeight - SWEEP_BAND_HEIGHT, 0) }],
+    transform: [
+      {
+        translateY:
+          sweep.value * Math.max(containerHeight - SWEEP_BAND_HEIGHT, 0),
+      },
+    ],
   }));
   const ringStyleA = useAnimatedStyle(() => ({
     opacity: (1 - ringA.value) * 0.45,
@@ -113,9 +146,11 @@ export function AIScanningOverlay() {
       <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
       <Box className="bg-black/[0.32]" style={StyleSheet.absoluteFill} />
 
-      <Animated.View style={[styles.sweepBand, sweepStyle, { pointerEvents: 'none' }]}>
+      <Animated.View
+        style={[styles.sweepBand, sweepStyle, { pointerEvents: "none" }]}
+      >
         <LinearGradient
-          colors={['transparent', 'rgba(172,138,70,0.5)', 'transparent']}
+          colors={["transparent", "rgba(172,138,70,0.5)", "transparent"]}
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
@@ -123,7 +158,9 @@ export function AIScanningOverlay() {
       <Box className="flex-1 items-center justify-center gap-6 px-10">
         <Box className="flex-row items-center gap-1.5 self-center rounded-full border border-gold/40 bg-gold/16 px-3 py-1">
           <Ionicons name="sparkles" size={12} color={colors.gold} />
-          <Text className="font-mono text-[10px] tracking-[1.5px] text-gold">GEMINI AI</Text>
+          <Text className="font-mono text-[10px] tracking-[1.5px] text-gold">
+            GEMINI AI
+          </Text>
         </Box>
 
         <Box className="items-center justify-center" style={styles.badgeArea}>
@@ -132,7 +169,12 @@ export function AIScanningOverlay() {
           <Animated.View style={[styles.glow, glowStyle]} />
           <Box
             className="h-16 w-16 items-center justify-center rounded-full border border-gold/50 bg-gold/20"
-            style={{ shadowColor: colors.gold, shadowRadius: 16, shadowOpacity: 0.5, shadowOffset: { width: 0, height: 0 } }}
+            style={{
+              shadowColor: colors.gold,
+              shadowRadius: 16,
+              shadowOpacity: 0.5,
+              shadowOffset: { width: 0, height: 0 },
+            }}
           >
             <Ionicons name="sparkles" size={26} color={colors.gold} />
           </Box>
@@ -151,7 +193,8 @@ export function AIScanningOverlay() {
               className="h-1.5 rounded-full"
               style={{
                 width: index === stepIndex ? 20 : 6,
-                backgroundColor: index <= stepIndex ? colors.gold : 'rgba(255,255,255,0.28)',
+                backgroundColor:
+                  index <= stepIndex ? colors.gold : "rgba(255,255,255,0.28)",
               }}
             />
           ))}
@@ -169,7 +212,7 @@ const styles = StyleSheet.create({
     width: RING_SIZE,
   },
   ring: {
-    position: 'absolute',
+    position: "absolute",
     height: RING_SIZE,
     width: RING_SIZE,
     borderRadius: RING_SIZE / 2,
@@ -177,14 +220,14 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
   },
   glow: {
-    position: 'absolute',
+    position: "absolute",
     height: 84,
     width: 84,
     borderRadius: 42,
     backgroundColor: colors.gold,
   },
   sweepBand: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     height: SWEEP_BAND_HEIGHT,

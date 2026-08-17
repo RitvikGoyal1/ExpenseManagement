@@ -1,10 +1,10 @@
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { Platform } from 'react-native';
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { Platform } from "react-native";
 
-import { Transaction } from '@/types/transaction';
+import { Transaction } from "@/types/transaction";
 
-const CSV_HEADERS = ['Vendor', 'Amount', 'Category', 'Date', 'IsDeductible'];
+const CSV_HEADERS = ["Vendor", "Amount", "Category", "Date", "IsDeductible"];
 
 function escapeCsvField(value: string): string {
   // Quote (and double up any embedded quotes) whenever the field itself
@@ -13,7 +13,7 @@ function escapeCsvField(value: string): string {
 }
 
 function toCsvRow(fields: string[]): string {
-  return fields.map(escapeCsvField).join(',');
+  return fields.map(escapeCsvField).join(",");
 }
 
 function transactionToCsvRow(transaction: Transaction): string {
@@ -23,13 +23,16 @@ function transactionToCsvRow(transaction: Transaction): string {
     transaction.category,
     transaction.date.slice(0, 10), // YYYY-MM-DD — unambiguous for spreadsheet import
     // Spelled out rather than TRUE/FALSE — this file is read by a human accountant, not just parsed.
-    transaction.isDeductible ? 'Yes' : 'No',
+    transaction.isDeductible ? "Yes" : "No",
   ]);
 }
 
 export function buildTransactionsCsv(transactions: Transaction[]): string {
-  const rows = [toCsvRow(CSV_HEADERS), ...transactions.map(transactionToCsvRow)];
-  return rows.join('\n');
+  const rows = [
+    toCsvRow(CSV_HEADERS),
+    ...transactions.map(transactionToCsvRow),
+  ];
+  return rows.join("\n");
 }
 
 /**
@@ -41,15 +44,18 @@ export function buildTransactionsCsv(transactions: Transaction[]): string {
  *
  * Throws if the device can't present a share sheet at all (e.g. web).
  */
-export async function generateAndShareCSV(transactions: Transaction[], fileName = 'Tax_Export.csv'): Promise<void> {
+export async function generateAndShareCSV(
+  transactions: Transaction[],
+  fileName = "Tax_Export.csv",
+): Promise<void> {
   const csv = buildTransactionsCsv(transactions);
 
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     // expo-file-system and expo-sharing aren't available on web, so hand the
     // file off through the browser's own download flow instead.
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
+    const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = fileName;
     document.body.appendChild(anchor);
@@ -69,8 +75,8 @@ export async function generateAndShareCSV(transactions: Transaction[], fileName 
   }
 
   await Sharing.shareAsync(file.uri, {
-    mimeType: 'text/csv',
-    UTI: 'public.comma-separated-values-text',
-    dialogTitle: 'Export transactions',
+    mimeType: "text/csv",
+    UTI: "public.comma-separated-values-text",
+    dialogTitle: "Export transactions",
   });
 }

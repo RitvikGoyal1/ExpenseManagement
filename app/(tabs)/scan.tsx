@@ -1,33 +1,47 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, StyleSheet } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import { Ionicons } from "@expo/vector-icons";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    Linking,
+    StyleSheet,
+} from "react-native";
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSequence,
+    withSpring,
+    withTiming,
+} from "react-native-reanimated";
 
-import { AIScanningOverlay } from '@/components/ui/AIScanningOverlay';
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { Box } from '@/components/ui/box';
-import { FadeSlideIn } from '@/components/ui/FadeSlideIn';
-import { ManualTransactionModal } from '@/components/ui/ManualTransactionModal';
-import { ReceiptConfirmationModal } from '@/components/ui/ReceiptConfirmationModal';
-import { SafeAreaView } from '@/components/ui/safe-area-view';
-import { Text } from '@/components/ui/text';
-import { springs } from '@/constants/motion';
-import { colors } from '@/constants/theme';
-import { ParsedReceiptData, processReceiptImage } from '@/services/ocrService';
-import { useTransactionStore } from '@/store/useTransactionStore';
-import { Transaction } from '@/types/transaction';
+import { AIScanningOverlay } from "@/components/ui/AIScanningOverlay";
+import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
+import { Box } from "@/components/ui/box";
+import { FadeSlideIn } from "@/components/ui/FadeSlideIn";
+import { ManualTransactionModal } from "@/components/ui/ManualTransactionModal";
+import { ReceiptConfirmationModal } from "@/components/ui/ReceiptConfirmationModal";
+import { SafeAreaView } from "@/components/ui/safe-area-view";
+import { Text } from "@/components/ui/text";
+import { springs } from "@/constants/motion";
+import { colors } from "@/constants/theme";
+import { ParsedReceiptData, processReceiptImage } from "@/services/ocrService";
+import { useTransactionStore } from "@/store/useTransactionStore";
+import { Transaction } from "@/types/transaction";
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<CameraType>('back');
+  const [facing, setFacing] = useState<CameraType>("back");
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [parsedReceipt, setParsedReceipt] = useState<ParsedReceiptData | null>(null);
+  const [parsedReceipt, setParsedReceipt] = useState<ParsedReceiptData | null>(
+    null,
+  );
   const [isConfirmVisible, setIsConfirmVisible] = useState(false);
   const [isManualEntryVisible, setIsManualEntryVisible] = useState(false);
   const cameraRef = useRef<CameraView>(null);
@@ -52,7 +66,10 @@ export default function ScanScreen() {
     }
     // Fire the shutter flash the instant the button is pressed, not once
     // takePictureAsync resolves — feedback belongs on the causal event.
-    flashOpacity.value = withSequence(withTiming(0.85, { duration: 40 }), withTiming(0, { duration: 220 }));
+    flashOpacity.value = withSequence(
+      withTiming(0.85, { duration: 40 }),
+      withTiming(0, { duration: 220 }),
+    );
 
     // Quality kept modest on purpose: OCR.space's free tier caps uploads at
     // 1MB, and full-quality phone photos blow past that easily.
@@ -63,21 +80,22 @@ export default function ScanScreen() {
   }, [flashOpacity, isCameraReady]);
 
   const handlePickFromLibrary = useCallback(async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
       Alert.alert(
-        'Photos access needed',
-        'Allow access to your photos to import a receipt, or take a new one with the camera instead.',
+        "Photos access needed",
+        "Allow access to your photos to import a receipt, or take a new one with the camera instead.",
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => Linking.openSettings() },
         ],
       );
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       // Same reasoning as the capture quality above: stay under OCR.space's
       // free-tier 1MB upload cap.
       quality: 0.5,
@@ -130,7 +148,7 @@ export default function ScanScreen() {
       addTransaction(transaction);
       setIsConfirmVisible(false);
       setCapturedUri(null);
-      router.navigate('/');
+      router.navigate("/");
     },
     [addTransaction, router],
   );
@@ -147,7 +165,7 @@ export default function ScanScreen() {
     (transaction: Transaction) => {
       addTransaction(transaction);
       setIsManualEntryVisible(false);
-      router.navigate('/');
+      router.navigate("/");
     },
     [addTransaction, router],
   );
@@ -157,7 +175,7 @@ export default function ScanScreen() {
   }, []);
 
   const toggleFacing = useCallback(() => {
-    setFacing((current) => (current === 'back' ? 'front' : 'back'));
+    setFacing((current) => (current === "back" ? "front" : "back"));
   }, []);
 
   const flashStyle = useAnimatedStyle(() => ({
@@ -173,7 +191,12 @@ export default function ScanScreen() {
   }
 
   if (!permission.granted) {
-    return <PermissionGate canAskAgain={permission.canAskAgain} onRequestPermission={requestPermission} />;
+    return (
+      <PermissionGate
+        canAskAgain={permission.canAskAgain}
+        onRequestPermission={requestPermission}
+      />
+    );
   }
 
   if (capturedUri) {
@@ -207,13 +230,17 @@ export default function ScanScreen() {
         />
       )}
 
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', pointerEvents: 'none' }, flashStyle]} />
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: "#FFFFFF", pointerEvents: "none" },
+          flashStyle,
+        ]}
+      />
 
-      <SafeAreaView className="flex-1 justify-between" edges={['top']}>
+      <SafeAreaView className="flex-1 justify-between" edges={["top"]}>
         <Box className="flex-row items-center justify-between px-6 pt-2">
-          <Text
-            className="overflow-hidden rounded-full border border-border bg-glass/[0.06] px-3 py-1.5 font-body-semibold text-[13px] text-glass"
-          >
+          <Text className="overflow-hidden rounded-full border border-border bg-glass/[0.06] px-3 py-1.5 font-body-semibold text-[13px] text-glass">
             Align the receipt within the frame
           </Text>
           <AnimatedPressable
@@ -222,11 +249,18 @@ export default function ScanScreen() {
             hitSlop={8}
             scaleTo={0.85}
           >
-            <Ionicons name="camera-reverse-outline" size={22} color={colors.glass} />
+            <Ionicons
+              name="camera-reverse-outline"
+              size={22}
+              color={colors.glass}
+            />
           </AnimatedPressable>
         </Box>
 
-        <Box className="flex-row items-center justify-between px-10" style={{ paddingBottom: tabBarHeight + 16 }}>
+        <Box
+          className="flex-row items-center justify-between px-10"
+          style={{ paddingBottom: tabBarHeight + 16 }}
+        >
           <AnimatedPressable
             className="h-14 w-14 items-center justify-center rounded-full border border-glass/40 bg-glass/[0.06]"
             onPress={handlePickFromLibrary}
@@ -237,8 +271,13 @@ export default function ScanScreen() {
           </AnimatedPressable>
 
           <AnimatedPressable
-            className={`h-[76px] w-[76px] items-center justify-center rounded-[38px] border-4 border-glass/90 ${!isCameraReady ? 'opacity-40' : ''}`}
-            style={{ shadowColor: colors.primary, shadowRadius: 20, shadowOpacity: 0.8, shadowOffset: { width: 0, height: 0 } }}
+            className={`h-[76px] w-[76px] items-center justify-center rounded-[38px] border-4 border-glass/90 ${!isCameraReady ? "opacity-40" : ""}`}
+            style={{
+              shadowColor: colors.primary,
+              shadowRadius: 20,
+              shadowOpacity: 0.8,
+              shadowOffset: { width: 0, height: 0 },
+            }}
             onPress={handleCapture}
             disabled={!isCameraReady}
             scaleTo={0.88}
@@ -274,7 +313,13 @@ interface PreviewViewProps {
   onUsePhoto: () => void;
 }
 
-function PreviewView({ uri, isProcessing, tabBarHeight, onRetake, onUsePhoto }: PreviewViewProps) {
+function PreviewView({
+  uri,
+  isProcessing,
+  tabBarHeight,
+  onRetake,
+  onUsePhoto,
+}: PreviewViewProps) {
   const reveal = useSharedValue(0);
 
   useEffect(() => {
@@ -289,7 +334,11 @@ function PreviewView({ uri, isProcessing, tabBarHeight, onRetake, onUsePhoto }: 
   return (
     <Box className="flex-1 bg-background">
       <Animated.View style={[StyleSheet.absoluteFill, revealStyle]}>
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="contain"
+        />
       </Animated.View>
 
       {isProcessing && (
@@ -300,23 +349,42 @@ function PreviewView({ uri, isProcessing, tabBarHeight, onRetake, onUsePhoto }: 
 
       <Box
         className="flex-row gap-4 px-6 pt-4"
-        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: tabBarHeight + 16 }}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          paddingBottom: tabBarHeight + 16,
+        }}
       >
         <AnimatedPressable
           className="flex-1 flex-row items-center justify-center gap-1 rounded-lg border border-border bg-glass/[0.14] py-3.5"
           onPress={onRetake}
         >
-          <Ionicons name={isProcessing ? 'close' : 'refresh'} size={18} color={colors.glass} />
-          <Text className="font-body-semibold text-[15px] text-glass">{isProcessing ? 'Cancel' : 'Retake'}</Text>
+          <Ionicons
+            name={isProcessing ? "close" : "refresh"}
+            size={18}
+            color={colors.glass}
+          />
+          <Text className="font-body-semibold text-[15px] text-glass">
+            {isProcessing ? "Cancel" : "Retake"}
+          </Text>
         </AnimatedPressable>
         <AnimatedPressable
-          className={`flex-1 flex-row items-center justify-center gap-1 rounded-lg bg-primary py-3.5 ${isProcessing ? 'opacity-50' : ''}`}
-          style={{ shadowColor: '#000000', shadowRadius: 10, shadowOpacity: 0.3, shadowOffset: { width: 0, height: 3 } }}
+          className={`flex-1 flex-row items-center justify-center gap-1 rounded-lg bg-primary py-3.5 ${isProcessing ? "opacity-50" : ""}`}
+          style={{
+            shadowColor: "#000000",
+            shadowRadius: 10,
+            shadowOpacity: 0.3,
+            shadowOffset: { width: 0, height: 3 },
+          }}
           onPress={onUsePhoto}
           disabled={isProcessing}
         >
           <Ionicons name="checkmark" size={18} color={colors.glass} />
-          <Text className="font-body-semibold text-[15px] text-glass">Use Photo</Text>
+          <Text className="font-body-semibold text-[15px] text-glass">
+            Use Photo
+          </Text>
         </AnimatedPressable>
       </Box>
     </Box>
@@ -341,23 +409,38 @@ interface PermissionGateProps {
   onRequestPermission: () => void;
 }
 
-function PermissionGate({ canAskAgain, onRequestPermission }: PermissionGateProps) {
+function PermissionGate({
+  canAskAgain,
+  onRequestPermission,
+}: PermissionGateProps) {
   return (
     <Box className="flex-1 items-center justify-center bg-background px-8">
       <FadeSlideIn className="items-center">
         <Box className="mb-6 h-[72px] w-[72px] items-center justify-center rounded-full bg-primary/16">
           <Ionicons name="camera-outline" size={32} color={colors.primary} />
         </Box>
-        <Text className="font-display-semibold text-[21px] text-foreground">Camera access needed</Text>
+        <Text className="font-display-semibold text-[21px] text-foreground">
+          Camera access needed
+        </Text>
         <Text className="mt-2 text-center font-body text-sm leading-5 text-muted-foreground">
-          We use your camera to photograph receipts so we can track your spending automatically.
+          We use your camera to photograph receipts so we can track your
+          spending automatically.
         </Text>
         <AnimatedPressable
           className="mt-6 rounded-lg bg-primary px-8 py-3.5"
-          style={{ shadowColor: colors.primary, shadowRadius: 12, shadowOpacity: 0.22, shadowOffset: { width: 0, height: 4 } }}
-          onPress={canAskAgain ? onRequestPermission : () => Linking.openSettings()}
+          style={{
+            shadowColor: colors.primary,
+            shadowRadius: 12,
+            shadowOpacity: 0.22,
+            shadowOffset: { width: 0, height: 4 },
+          }}
+          onPress={
+            canAskAgain ? onRequestPermission : () => Linking.openSettings()
+          }
         >
-          <Text className="font-body-semibold text-[15px] text-glass">{canAskAgain ? 'Grant Permission' : 'Open Settings'}</Text>
+          <Text className="font-body-semibold text-[15px] text-glass">
+            {canAskAgain ? "Grant Permission" : "Open Settings"}
+          </Text>
         </AnimatedPressable>
       </FadeSlideIn>
     </Box>
