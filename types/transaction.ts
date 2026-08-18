@@ -59,9 +59,14 @@ export interface Transaction {
   lineItems?: LineItem[];
 }
 
-export interface MonthlySummary {
-  month: string;
+export type SummaryPeriod = 'week' | 'month' | 'year' | 'all';
+
+export interface PeriodSummary {
+  period: SummaryPeriod;
+  label: string;
   income: number;
   expenses: number;
-  previousMonthExpenses: number;
+  previousExpenses: number;
+  /** False for 'all' — there's no prior all-time bucket to compare against. */
+  hasComparison: boolean;
 }

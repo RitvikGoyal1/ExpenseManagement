@@ -1,7 +1,7 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { MonthSummaryCard } from '@/components/home/MonthSummaryCard';
 import { TransactionFilters } from '@/components/home/TransactionFilters';
@@ -12,10 +12,11 @@ import { SafeAreaView } from '@/components/ui/safe-area-view';
 import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
 import { colors } from '@/constants/theme';
-import { mockMonthlySummary } from '@/data/mockTransactions';
+import { mockPeriodSummaries } from '@/data/mockTransactions';
 import { useOnboardingStore } from '@/store/useOnboardingStore';
 import { useTransactionStore } from '@/store/useTransactionStore';
-import { computeMonthlySummary, resolveSummaryMonth } from '@/utils/analytics';
+import { SummaryPeriod } from '@/types/transaction';
+import { computeSummary, resolveSummaryReference } from '@/utils/analytics';
 import { useTransactionFilters } from '@/utils/useTransactionFilters';
 
 // Caps the stagger so a long, freshly-imported list doesn't take forever to
@@ -26,15 +27,16 @@ const ROW_STAGGER_MS = 45;
 export default function HomeScreen() {
   const transactions = useTransactionStore((state) => state.transactions);
   const useMockData = useOnboardingStore((state) => state.useMockData);
-  // Falls back to the most recent month that actually has transactions when the real current
-  // month doesn't — otherwise a device with only past-dated data (old receipts, a backdated manual
+  const [period, setPeriod] = useState<SummaryPeriod>('month');
+  // Falls back to the most recent bucket that actually has transactions when the real current
+  // one doesn't — otherwise a device with only past-dated data (old receipts, a backdated manual
   // entry) would show a correctly-computed but permanently useless "$0.00 this month".
-  const summaryMonth = useMemo(() => resolveSummaryMonth(transactions), [transactions]);
+  const summaryReference = useMemo(() => resolveSummaryReference(transactions, period), [transactions, period]);
   // Recomputed from the live transaction list, not a static snapshot — this is what makes "Net
   // this month" track every scan/manual entry as it's added instead of reading zero forever.
   const summary = useMemo(
-    () => (useMockData ? mockMonthlySummary : computeMonthlySummary(transactions, summaryMonth)),
-    [useMockData, transactions, summaryMonth],
+    () => (useMockData ? mockPeriodSummaries[period] : computeSummary(transactions, period, summaryReference)),
+    [useMockData, transactions, period, summaryReference],
   );
   const tabBarHeight = useBottomTabBarHeight();
   const router = useRouter();
@@ -49,7 +51,7 @@ export default function HomeScreen() {
         </FadeSlideIn>
 
         <FadeSlideIn delay={60}>
-          <MonthSummaryCard summary={summary} />
+          <MonthSummaryCard summary={summary} period={period} onPeriodChange={setPeriod} />
         </FadeSlideIn>
 
         <FadeSlideIn delay={120} className="mt-8">
