@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { LayoutChangeEvent } from 'react-native';
+import { LayoutChangeEvent, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -24,7 +24,8 @@ interface TransactionFiltersProps {
  * (always-mounted, never conditionally unrendered) content via onLayout, then animated between 0
  * and that measured height — content keeps its natural size while collapsed (RN/Yoga children don't
  * shrink by default), the parent's `overflow: hidden` just clips it, which is what makes the
- * measure-while-clipped trick work without a second hidden copy of the content.
+ * measure-while-clipped trick work without a second hidden copy of the content. The measured node
+ * must be a real RN View (see below), not gluestack's Box, or onLayout silently never fires on web.
  */
 export function TransactionFilters({ filters }: TransactionFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -73,7 +74,14 @@ export function TransactionFilters({ filters }: TransactionFiltersProps) {
       </Box>
 
       <Animated.View style={[{ overflow: 'hidden' }, panelStyle]}>
-        <Box className="gap-5 rounded-lg border border-border bg-card p-4" onLayout={handleContentLayout} pointerEvents={isExpanded ? 'auto' : 'none'}>
+        {/* Raw RN View, not gluestack's Box — Box.web.tsx renders a plain <div>, which has no
+            concept of RN's onLayout, so it would never fire. react-native-web's View properly
+            backs onLayout with a ResizeObserver; className still applies via UniWind's JSX transform. */}
+        <View
+          className="shrink-0 gap-5 rounded-lg border border-border bg-card p-4"
+          onLayout={handleContentLayout}
+          pointerEvents={isExpanded ? 'auto' : 'none'}
+        >
           <PriceRangeSlider
             min={0}
             max={filters.priceCeiling}
@@ -95,7 +103,7 @@ export function TransactionFilters({ filters }: TransactionFiltersProps) {
               <Text className="font-body-semibold text-xs text-muted-foreground">Clear Filters</Text>
             </AnimatedPressable>
           )}
-        </Box>
+        </View>
       </Animated.View>
     </Box>
   );
