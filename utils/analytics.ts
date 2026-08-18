@@ -1,19 +1,27 @@
 import { chartPalette } from '@/constants/theme';
-import { BalanceSheet, CashFlowSummary, SpendingCategory } from '@/types/analytics';
+import { BalanceSheet, CashFlowSummary, NetWorthItem, SpendingCategory } from '@/types/analytics';
 import { PeriodSummary, SummaryPeriod, Transaction } from '@/types/transaction';
 
-/**
- * Net worth needs actual account balances (cash, investments, mortgage, ...) — nothing this app
- * tracks anywhere. Rather than fabricate a number out of transaction history (which has no
- * relationship to net worth), real-data mode always shows this until account balances exist as a
- * real feature.
- */
+/** The shape shown before the user has entered any assets/liabilities in Settings. */
 export const EMPTY_BALANCE_SHEET: BalanceSheet = {
   assets: [],
   liabilities: [],
   totalAssets: 0,
   totalLiabilities: 0,
 };
+
+/** Groups Settings' flat net worth item list into NetWorthCard's assets/liabilities shape. */
+export function computeBalanceSheet(items: NetWorthItem[]): BalanceSheet {
+  const assets = items.filter((item) => item.type === 'asset');
+  const liabilities = items.filter((item) => item.type === 'liability');
+
+  return {
+    assets,
+    liabilities,
+    totalAssets: assets.reduce((sum, item) => sum + item.amount, 0),
+    totalLiabilities: liabilities.reduce((sum, item) => sum + item.amount, 0),
+  };
+}
 
 function startOfDay(date: Date): Date {
   const start = new Date(date);

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy Policy — Expense Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header class="site">
+    <a class="brand" href="index.html">Expense Management</a>
+    <nav class="legal-nav">
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html" aria-current="page">Privacy</a>
+      <a href="data-collection.html">Data Collection</a>
+    </nav>
+  </header>
+
+  <h1>Privacy Policy</h1>
+  <p class="effective-date">Effective August 18, 2026</p>
+
+  <div class="card">
+    <section>
+      <h2>1. Who We Are</h2>
+      <p>"Expense Management" (the "App," "we," "us," or "our") is a personal finance and expense-tracking app developed and operated by an independent individual developer, based in Canada. This Privacy Policy explains what information the App collects, how it's used, and the choices available to you. Questions or requests can be sent to <a href="mailto:rks.peng@gmail.com">rks.peng@gmail.com</a>.</p>
+    </section>
+
+    <section>
+      <h2>2. Information We Collect</h2>
+      <p>We designed the App to work without collecting your name, email address, or phone number. Specifically:</p>
+      <p><strong>a) Information you provide</strong></p>
+      <p class="bullet">• Receipt photos you scan or import.</p>
+      <p class="bullet">• Transaction details — merchant name, amount, date, category, and whether you've marked something as tax-deductible.</p>
+      <p class="bullet">• Line items extracted or entered from receipts (individual products and prices).</p>
+      <p class="bullet">• Net worth entries you add — a label and dollar amount for each asset or liability.</p>
+      <p class="bullet">• Your self-reported employment type (salaried, freelancer, or business owner), collected during onboarding.</p>
+      <p class="bullet">• Any messages you send to the in-app AI chat assistant.</p>
+      <p class="bullet">• Anything you send us directly, such as an email requesting support or data deletion.</p>
+      <p><strong>b) Information collected automatically</strong></p>
+      <p>When you first open the App, we automatically create an anonymous session tied to your device installation so your data can sync to our servers and be there the next time you open the App. This session is a random identifier — it is not linked to your name or any other directly identifying information we hold. We do not currently use analytics, crash-reporting, or advertising software of any kind, so we do not collect device analytics, ad identifiers, or behavioral tracking data.</p>
+      <p><strong>c) Information from optional device permissions</strong></p>
+      <p class="bullet">• Camera — to let you photograph receipts. Only used when you actively take a photo.</p>
+      <p class="bullet">• Photo library — to let you import an existing receipt photo. Only used when you actively pick a photo.</p>
+      <p class="bullet">• Face ID / biometric authentication — used only to lock the App on your own device. Your biometric data is processed entirely by your device's operating system; we never receive, see, or store it.</p>
+      <p>Each permission is optional and can be revoked at any time in your device's system settings; revoking a permission just disables the related feature.</p>
+    </section>
+
+    <section>
+      <h2>3. How We Use Your Information</h2>
+      <p>We use the information above to: operate the App's core features (recording, categorizing, and displaying your transactions and net worth); extract data from receipt photos using OCR and AI (described in Section 4); power the AI chat assistant, which is given your spending categories, income type, and asset/liability totals as context so it can answer questions about your finances; generate the CSV export you request; and provide support when you contact us.</p>
+    </section>
+
+    <section>
+      <h2>4. Third Parties We Share Data With</h2>
+      <p>We use a small number of third-party service providers to operate the App. We do not sell your information, and we do not share it for advertising or marketing purposes.</p>
+      <p class="bullet">• <strong>Supabase</strong> — our database, file storage, and authentication provider. Your transactions, net worth entries, and receipt photos are stored on Supabase's infrastructure, protected by access rules that restrict each anonymous session to its own data.</p>
+      <p class="bullet">• <strong>Google (Gemini API)</strong> — receipt photos and your chat messages (along with the financial context described in Section 3) are sent to Google's Gemini AI service to extract receipt data and generate chat responses. This data is subject to Google's own API terms and privacy practices.</p>
+      <p class="bullet">• <strong>OCR.space</strong> — used as a fallback text-extraction service if Gemini is unavailable. Receipt photos may be sent to OCR.space for processing. We currently use OCR.space's shared public testing endpoint rather than a dedicated account; we are working to move this to a dedicated, privacy-reviewed integration.</p>
+      <p>Because these providers may process data outside of Canada (including in the United States), your information may be transferred internationally as a result. Each provider is contractually or contextually limited to using this data to provide the requested service to us.</p>
+    </section>
+
+    <section>
+      <h2>5. Data Storage &amp; Security</h2>
+      <p>Receipt photos are stored in a private storage bucket and are only ever made accessible to your session through short-lived, time-limited links generated on demand. Database rows are protected by row-level security rules tied to your anonymous session. No method of transmission or storage is 100% secure, and we cannot guarantee absolute security.</p>
+    </section>
+
+    <section>
+      <h2>6. Data Retention &amp; Deletion</h2>
+      <p>We retain your data for as long as your session remains active on our servers, or until you ask us to delete it. Using "Reset App Data" in Settings clears the transactions, net worth items, and onboarding information stored on your device, and starts you over in the App — but it does not delete the corresponding data already stored on our servers.</p>
+      <p>To request full deletion of your data from our servers (transactions, net worth entries, and receipt photos), email <a href="mailto:rks.peng@gmail.com">rks.peng@gmail.com</a> from any address and describe your request; because sessions are anonymous, we may ask for details (such as approximate account-creation date or sample transaction data) to help identify the right records. We aim to complete deletion requests within 30 days.</p>
+    </section>
+
+    <section>
+      <h2>7. Your Rights</h2>
+      <p>Depending on where you live, you may have rights to access, correct, or delete your personal information, or to object to certain processing. Because the App does not collect your name or contact information, the most direct way to exercise these rights is: use the in-app "Export Full History (CSV)" feature to access your transaction data, or email us to request access, correction, or deletion. We will respond to verifiable requests as required by applicable law, including Canada's Personal Information Protection and Electronic Documents Act (PIPEDA) and, where applicable, the EU/UK GDPR or U.S. state privacy laws.</p>
+    </section>
+
+    <section>
+      <h2>8. Children's Privacy</h2>
+      <p>The App is not directed at, and is not intended for use by, anyone under 18. We do not knowingly collect information from children. If you believe a child has provided us information, contact us and we will delete it.</p>
+    </section>
+
+    <section>
+      <h2>9. Push Notifications</h2>
+      <p>Settings includes a Push Notifications toggle. This preference is currently stored only on your device — the App does not yet send push notifications, and no data is transmitted for this purpose. We will update this Policy before that changes.</p>
+    </section>
+
+    <section>
+      <h2>10. Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. Material changes will be reflected by updating the "Effective Date" above, and where practical, we'll notify you in the App.</p>
+    </section>
+
+    <section>
+      <h2>11. Contact Us</h2>
+      <p>Privacy questions, or requests to access or delete your data: <a href="mailto:rks.peng@gmail.com">rks.peng@gmail.com</a>.</p>
+    </section>
+  </div>
+
+  <footer class="site">
+    <a href="index.html">← Back to Legal</a> · Contact <a href="mailto:rks.peng@gmail.com">rks.peng@gmail.com</a>
+  </footer>
+</div>
+</body>
+</html>

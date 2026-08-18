@@ -31,6 +31,13 @@ export interface BalanceSheet {
   totalLiabilities: number;
 }
 
+export type NetWorthItemType = 'asset' | 'liability';
+
+/** A single user-entered asset/liability line (Settings' Net Worth section) — groups into a BalanceSheet via computeBalanceSheet. */
+export interface NetWorthItem extends BalanceSheetItem {
+  type: NetWorthItemType;
+}
+
 export interface QuickPrompt {
   id: string;
   question: string;

@@ -28,7 +28,8 @@ import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { colors } from "@/constants/theme";
 import "@/global.css";
 import { initializeAnonymousSession } from "@/services/authService";
-import { fetchTransactions } from "@/services/databaseService";
+import { fetchNetWorthItems, fetchTransactions } from "@/services/databaseService";
+import { useNetWorthStore } from "@/store/useNetWorthStore";
 import { useOnboardingStore } from "@/store/useOnboardingStore";
 import { useTransactionStore } from "@/store/useTransactionStore";
 
@@ -46,22 +47,25 @@ export default function RootLayout() {
   const importTransactions = useTransactionStore(
     (state) => state.importTransactions,
   );
+  const importNetWorthItems = useNetWorthStore((state) => state.importItems);
 
   useEffect(() => {
     // Fire-and-forget: silent by design, and independent of BiometricLock's local gate, so it
-    // shouldn't block first paint. The Zustand transaction store only ever lives in memory, so
-    // every cold start needs this to repopulate it from Supabase — a failure here just leaves the
-    // list empty until the next successful sync, nothing for the user to act on at boot.
+    // shouldn't block first paint. The Zustand transaction/net-worth stores only ever live in
+    // memory, so every cold start needs this to repopulate them from Supabase — a failure here
+    // just leaves the lists empty until the next successful sync, nothing for the user to act on
+    // at boot.
     (async () => {
       try {
         await initializeAnonymousSession();
-        const transactions = await fetchTransactions();
+        const [transactions, netWorthItems] = await Promise.all([fetchTransactions(), fetchNetWorthItems()]);
         importTransactions(transactions);
+        importNetWorthItems(netWorthItems);
       } catch (error) {
-        console.warn("[RootLayout] Failed to sync transactions from Supabase:", error);
+        console.warn("[RootLayout] Failed to sync data from Supabase:", error);
       }
     })();
-  }, [importTransactions]);
+  }, [importTransactions, importNetWorthItems]);
 
   const [fontsLoaded, fontError] = useFonts({
     // On iOS fonts are resolved by their PostScript name (hyphenated), not the
@@ -108,6 +112,10 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen
                   name="transactions"
+                  options={{ animation: "slide_from_right" }}
+                />
+                <Stack.Screen
+                  name="legal"
                   options={{ animation: "slide_from_right" }}
                 />
               </Stack.Protected>

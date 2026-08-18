@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Data Collection &amp; Permissions — Expense Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header class="site">
+    <a class="brand" href="index.html">Expense Management</a>
+    <nav class="legal-nav">
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="data-collection.html" aria-current="page">Data Collection</a>
+    </nav>
+  </header>
+
+  <h1>Data Collection &amp; Permissions</h1>
+  <p class="effective-date">Effective August 18, 2026</p>
+
+  <p class="intro">This page summarizes, in plain language, what Expense Management collects and why. For the full legal terms, see the <a href="privacy.html">Privacy Policy</a>.</p>
+
+  <div class="card">
+    <section>
+      <h2>What We Collect</h2>
+      <p class="bullet">• Receipt photos — when you scan or import one.</p>
+      <p class="bullet">• Transaction details — merchant, amount, date, category, tax-deductible flag.</p>
+      <p class="bullet">• Line items — individual products/prices read off a receipt.</p>
+      <p class="bullet">• Net worth entries — labels and amounts you enter for assets/liabilities.</p>
+      <p class="bullet">• Employment type — salaried, freelancer, or business owner (asked once, during setup).</p>
+      <p class="bullet">• Chat messages — anything you type to the AI assistant.</p>
+    </section>
+
+    <section>
+      <h2>What We DON'T Collect</h2>
+      <p class="bullet">• Your name</p>
+      <p class="bullet">• Your email address or phone number</p>
+      <p class="bullet">• Your location</p>
+      <p class="bullet">• Your contacts</p>
+      <p class="bullet">• Bank account or card numbers — the App has no bank-linking feature; everything is entered manually.</p>
+      <p class="bullet">• Advertising or tracking identifiers — there is no analytics or ad SDK in this App.</p>
+    </section>
+
+    <section>
+      <h2>Where It Goes</h2>
+      <p class="bullet">• <strong>Supabase</strong> — stores your transactions, net worth data, and receipt photos.</p>
+      <p class="bullet">• <strong>Google Gemini AI</strong> — reads your receipt photos to extract data, and powers the chat assistant (which is given your spending categories and totals as context).</p>
+      <p class="bullet">• <strong>OCR.space</strong> — a fallback text-extraction service used only if Gemini is unavailable.</p>
+    </section>
+
+    <section>
+      <h2>Permissions This App Requests</h2>
+      <p class="bullet">• Camera — to photograph a receipt. Asked only when you tap "scan."</p>
+      <p class="bullet">• Photos — to import an existing receipt photo. Asked only when you tap "import."</p>
+      <p class="bullet">• Face ID / biometrics — to lock the App on your device. This never leaves your device — we never see it.</p>
+      <p>You can revoke any of these anytime in your device's system Settings.</p>
+    </section>
+
+    <section>
+      <h2>Deleting Your Data</h2>
+      <p>Resetting the App (Settings → Reset App Data) clears what's on your device, but not what's already synced to our servers. To delete everything permanently, email <a href="mailto:rks.peng@gmail.com">rks.peng@gmail.com</a>.</p>
+    </section>
+
+    <section>
+      <h2>Questions?</h2>
+      <p>See the full <a href="privacy.html">Privacy Policy</a> and <a href="terms.html">Terms of Service</a>, or email <a href="mailto:rks.peng@gmail.com">rks.peng@gmail.com</a>.</p>
+    </section>
+  </div>
+
+  <footer class="site">
+    <a href="index.html">← Back to Legal</a> · Contact <a href="mailto:rks.peng@gmail.com">rks.peng@gmail.com</a>
+  </footer>
+</div>
+</body>
+</html>

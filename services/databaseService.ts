@@ -1,7 +1,9 @@
+import { NetWorthItem, NetWorthItemType } from '@/types/analytics';
 import { LineItem, Transaction, TRANSACTION_CATEGORIES, TransactionCategory } from '@/types/transaction';
 import { supabase } from '@/utils/supabase';
 
 const TRANSACTIONS_TABLE = 'transactions';
+const NET_WORTH_TABLE = 'net_worth_items';
 
 // Deployed schema (Supabase SQL editor) — RLS requires user_id to match auth.uid(), and there is
 // no deduction_category column, so that field stays local-only (see the comment on TransactionInput
@@ -136,6 +138,117 @@ export async function fetchTransactions(): Promise<Transaction[]> {
  */
 export async function deleteTransaction(id: string): Promise<void> {
   const { error } = await supabase.from(TRANSACTIONS_TABLE).delete().eq('id', id);
+  if (error) {
+    throw error;
+  }
+}
+
+// Deployed schema (Supabase SQL editor) — same RLS shape as `transactions` above (user_id must
+// match auth.uid()), created for the Settings "Net Worth" section since account-balance data
+// didn't exist anywhere in this app before:
+//
+//   CREATE TABLE net_worth_items (
+//     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+//     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+//     label TEXT NOT NULL,
+//     amount NUMERIC NOT NULL,
+//     item_type TEXT NOT NULL CHECK (item_type IN ('asset', 'liability')),
+//     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+//   );
+//
+//   ALTER TABLE net_worth_items ENABLE ROW LEVEL SECURITY;
+//   CREATE POLICY "Users manage their own net worth items" ON net_worth_items
+//     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+/** The fields NetWorthItemModal collects for one asset/liability line. */
+export interface NetWorthItemInput {
+  label: string;
+  amount: number;
+  type: NetWorthItemType;
+}
+
+interface NetWorthItemRow {
+  id: string;
+  label: string;
+  /** PostgREST serializes `numeric` columns as JSON strings (to avoid float precision loss), not numbers. */
+  amount: string | number;
+  item_type: string;
+}
+
+function isNetWorthItemType(value: string): value is NetWorthItemType {
+  return value === 'asset' || value === 'liability';
+}
+
+/**
+ * Inserts a net worth line item under the current anonymous (or, later, real) user and returns the
+ * server-generated row id — needed (unlike insertTransaction) because deleteNetWorthItem below has
+ * to target that exact row, and there's no other client-side id to fall back on.
+ */
+export async function insertNetWorthItem(item: NetWorthItemInput): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('No authenticated Supabase user — cannot insert a net worth item.');
+  }
+
+  const { data, error } = await supabase
+    .from(NET_WORTH_TABLE)
+    .insert({
+      user_id: user.id,
+      label: item.label,
+      amount: item.amount,
+      item_type: item.type,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data.id;
+}
+
+/**
+ * Fetches every net worth item belonging to the current Supabase user, newest first. Like the
+ * transaction store, useNetWorthStore only ever lives in memory, so this is what rehydrates it on
+ * app boot.
+ */
+export async function fetchNetWorthItems(): Promise<NetWorthItem[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('No authenticated Supabase user — cannot fetch net worth items.');
+  }
+
+  const { data, error } = await supabase
+    .from(NET_WORTH_TABLE)
+    .select('id, label, amount, item_type')
+    .order('created_at', { ascending: false })
+    .returns<NetWorthItemRow[]>();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? [])
+    .filter((row) => isNetWorthItemType(row.item_type))
+    .map((row) => ({
+      id: row.id,
+      label: row.label,
+      amount: Number(row.amount ?? 0),
+      type: row.item_type as NetWorthItemType,
+    }));
+}
+
+/**
+ * Deletes a single net worth item row. RLS scopes every query to rows the caller's `auth.uid()`
+ * owns, so there's no need to filter by user_id here too.
+ */
+export async function deleteNetWorthItem(id: string): Promise<void> {
+  const { error } = await supabase.from(NET_WORTH_TABLE).delete().eq('id', id);
   if (error) {
     throw error;
   }

@@ -13,14 +13,16 @@ import { ScrollView } from '@/components/ui/scroll-view';
 import { Text } from '@/components/ui/text';
 import { colors } from '@/constants/theme';
 import { mockBalanceSheet, mockCashFlow, mockQuickPrompts, mockSpendingCategories } from '@/data/mockAnalytics';
+import { useNetWorthStore } from '@/store/useNetWorthStore';
 import { useOnboardingStore } from '@/store/useOnboardingStore';
 import { useTransactionStore } from '@/store/useTransactionStore';
-import { computeCashFlowSummary, computeSpendingCategories, EMPTY_BALANCE_SHEET, resolveSummaryMonth } from '@/utils/analytics';
+import { computeBalanceSheet, computeCashFlowSummary, computeSpendingCategories, resolveSummaryMonth } from '@/utils/analytics';
 
 export default function AnalyticsScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const useMockData = useOnboardingStore((state) => state.useMockData);
   const transactions = useTransactionStore((state) => state.transactions);
+  const netWorthItems = useNetWorthStore((state) => state.items);
 
   // Same fallback Home uses: summarize the real current month if it has data, otherwise the most
   // recent month that does, so this agrees with the Home screen's Net card about which month
@@ -36,11 +38,12 @@ export default function AnalyticsScreen() {
     () => (useMockData ? mockCashFlow : computeCashFlowSummary(transactions, summaryMonth)),
     [useMockData, transactions, summaryMonth],
   );
-  // Net worth isn't derivable from a transaction list (no account-balance data exists anywhere in
-  // this app) — real-data mode always passes the honest "nothing tracked" shape rather than a
-  // fabricated number, and NetWorthCard itself only ever renders in mock mode below.
-  const balanceSheet = useMockData ? mockBalanceSheet : EMPTY_BALANCE_SHEET;
-  const hasAnalyticsToShow = useMockData || spendingCategories.length > 0 || cashFlow.totalIncome > 0 || cashFlow.totalOutflow > 0;
+  // Real-data mode builds this from whatever the user has entered in Settings' Net Worth section —
+  // empty (NetWorthCard just doesn't render, below) until they add their first item.
+  const balanceSheet = useMockData ? mockBalanceSheet : computeBalanceSheet(netWorthItems);
+  const hasNetWorth = balanceSheet.assets.length > 0 || balanceSheet.liabilities.length > 0;
+  const hasAnalyticsToShow =
+    useMockData || spendingCategories.length > 0 || cashFlow.totalIncome > 0 || cashFlow.totalOutflow > 0 || hasNetWorth;
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -69,9 +72,9 @@ export default function AnalyticsScreen() {
               <CashFlowChart cashFlow={cashFlow} />
             </FadeSlideIn>
 
-            {useMockData && (
+            {(useMockData || hasNetWorth) && (
               <FadeSlideIn delay={240} className="mt-6">
-                <NetWorthCard balanceSheet={mockBalanceSheet} />
+                <NetWorthCard balanceSheet={balanceSheet} />
               </FadeSlideIn>
             )}
           </>
