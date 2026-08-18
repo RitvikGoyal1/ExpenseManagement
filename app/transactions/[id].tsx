@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Box } from '@/components/ui/box';
@@ -15,6 +15,7 @@ import { ScrollView } from '@/components/ui/scroll-view';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { colors } from '@/constants/theme';
+import { deleteTransaction } from '@/services/databaseService';
 import { useTransactionStore } from '@/store/useTransactionStore';
 import { DEDUCTION_CATEGORIES, DeductionCategory, TRANSACTION_CATEGORIES, TransactionCategory } from '@/types/transaction';
 import { formatCurrency } from '@/utils/format';
@@ -25,6 +26,8 @@ export default function TransactionDetailScreen() {
   const router = useRouter();
   const transaction = useTransactionStore((state) => state.transactions.find((t) => t.id === id));
   const updateTransaction = useTransactionStore((state) => state.updateTransaction);
+  const removeTransaction = useTransactionStore((state) => state.removeTransaction);
+  const addTransaction = useTransactionStore((state) => state.addTransaction);
 
   const [merchant, setMerchant] = useState(transaction?.merchant ?? '');
   const [amountText, setAmountText] = useState(transaction ? String(transaction.amount) : '');
@@ -67,6 +70,23 @@ export default function TransactionDetailScreen() {
     router.back();
   };
 
+  // Optimistic, same as TransactionRow's swipe-to-delete: navigate back immediately and only
+  // restore + surface an alert if the remote delete actually fails.
+  const handleDelete = () => {
+    if (!transaction) {
+      return;
+    }
+    haptics.impact();
+    removeTransaction(transaction.id);
+    router.back();
+    deleteTransaction(transaction.id).catch((error) => {
+      console.warn('[TransactionDetailScreen] Failed to delete transaction:', error);
+      haptics.error();
+      addTransaction(transaction);
+      Alert.alert("Delete failed", "We couldn't delete this transaction. Check your connection and try again.");
+    });
+  };
+
   if (!transaction) {
     return (
       <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -81,7 +101,7 @@ export default function TransactionDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <Header onBack={() => router.back()} title="Transaction Details" />
+      <Header onBack={() => router.back()} onDelete={handleDelete} title="Transaction Details" />
 
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={12}>
         <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
@@ -235,17 +255,24 @@ export default function TransactionDetailScreen() {
 
 interface HeaderProps {
   onBack: () => void;
+  onDelete?: () => void;
   title: string;
 }
 
-function Header({ onBack, title }: HeaderProps) {
+function Header({ onBack, onDelete, title }: HeaderProps) {
   return (
     <Box className="flex-row items-center justify-between px-4 pb-2">
       <AnimatedPressable className="h-9 w-9 items-center justify-center rounded-full" onPress={onBack} scaleTo={0.85} hitSlop={8}>
         <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
       </AnimatedPressable>
       <Text className="font-body-semibold text-[15px] text-foreground">{title}</Text>
-      <Box className="h-9 w-9" />
+      {onDelete ? (
+        <AnimatedPressable className="h-9 w-9 items-center justify-center rounded-full" onPress={onDelete} scaleTo={0.85} hitSlop={8}>
+          <Ionicons name="trash-outline" size={19} color={colors.expense} />
+        </AnimatedPressable>
+      ) : (
+        <Box className="h-9 w-9" />
+      )}
     </Box>
   );
 }
