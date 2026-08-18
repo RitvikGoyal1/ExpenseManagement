@@ -256,7 +256,7 @@ export function ReceiptConfirmationModal({ visible, initialData, imageUri, onCan
               <BlurView intensity={50} tint="light" style={StyleSheet.absoluteFill} />
               <Box className="bg-white/[0.6]" style={StyleSheet.absoluteFill} />
 
-              <Animated.View style={keyboardSpacingStyle}>
+              <Animated.View style={[styles.scrollArea, keyboardSpacingStyle]}>
                 <Box className="px-6 pb-4 pt-3">
                   <Box className="mb-4 h-1 w-10 self-center rounded-full bg-foreground/20" />
 
@@ -276,7 +276,11 @@ export function ReceiptConfirmationModal({ visible, initialData, imageUri, onCan
                   </Box>
                 </Box>
 
-                <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
+                <ScrollView
+                  style={styles.scrollView}
+                  contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 8 }}
+                  keyboardShouldPersistTaps="handled"
+                >
                   <Box>
                     <Text className="mb-1.5 font-mono text-[11px] tracking-[1px] text-muted-foreground">VENDOR</Text>
                     <Input className="rounded-md border border-border bg-card px-4 py-3">
@@ -406,6 +410,16 @@ function Chip({ label, selected, onPress, tint = 'primary' }: ChipProps) {
 
 const styles = StyleSheet.create({
   fill: {
+    flex: 1,
+  },
+  // Bounds the header+scroll+footer column to the sheet's maxHeight so the ScrollView (not
+  // overflow:hidden on the sheet) is what handles content taller than the screen — otherwise the
+  // footer buttons get clipped off with no way to scroll to them on a short screen.
+  scrollArea: {
+    flex: 1,
+    minHeight: 0,
+  },
+  scrollView: {
     flex: 1,
   },
 });

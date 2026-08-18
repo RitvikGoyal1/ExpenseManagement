@@ -29,10 +29,14 @@ const CATEGORY_ICON: Record<TransactionCategory, IconName> = {
 };
 
 // Wide enough for a comfortable tap target, narrow enough that a small "just checking" swipe
-// doesn't already reveal it — DELETE_THRESHOLD (half of this) is where a released drag commits open.
+// doesn't already reveal it.
 const DELETE_WIDTH = 84;
 const DELETE_THRESHOLD = DELETE_WIDTH / 2;
 const OPEN_FLING_VELOCITY = -600;
+const CLOSE_FLING_VELOCITY = 600;
+// Any deliberate drag past this counts as "the user swiped" and commits the row fully open or
+// closed — see the comment on `pan.onEnd` below for why this can't require crossing DELETE_THRESHOLD.
+const MIN_COMMIT_DRAG = 4;
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -78,8 +82,11 @@ export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
   };
 
   // activeOffsetX/failOffsetY hand this off to the ScrollView's own vertical pan until the drag is
-  // unambiguously horizontal, so swiping a row doesn't fight the list's scroll.
+  // unambiguously horizontal, so swiping a row doesn't fight the list's scroll. Two-finger trackpad
+  // swipes are opt-in on web (RNGH defaults this off), so without it a laptop trackpad "swipe"
+  // never moves the row at all.
   const pan = Gesture.Pan()
+    .enableTrackpadTwoFingerGesture(true)
     .activeOffsetX([-10, 10])
     .failOffsetY([-12, 12])
     .onStart(() => {
@@ -89,7 +96,19 @@ export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
       translateX.value = Math.min(0, Math.max(-DELETE_WIDTH, dragStartX.value + event.translationX));
     })
     .onEnd((event) => {
-      const shouldOpen = translateX.value < -DELETE_THRESHOLD || event.velocityX < OPEN_FLING_VELOCITY;
+      // Mouse/trackpad input on web can deliver one continuous-feeling swipe as several short,
+      // separate gesture bursts (each with its own onEnd) rather than touch's single fluid drag.
+      // Deciding "open" only when the drag crosses DELETE_THRESHOLD meant an in-progress swipe kept
+      // snapping back to closed between bursts before the user could reach the trash can. Instead,
+      // commit fully open/closed based on which way this burst actually moved, and only fall back
+      // to DELETE_THRESHOLD when a burst barely moved at all (preserve whatever state it was already in).
+      const netDrag = translateX.value - dragStartX.value;
+      let shouldOpen = dragStartX.value <= -DELETE_THRESHOLD;
+      if (netDrag < -MIN_COMMIT_DRAG || event.velocityX < OPEN_FLING_VELOCITY) {
+        shouldOpen = true;
+      } else if (netDrag > MIN_COMMIT_DRAG || event.velocityX > CLOSE_FLING_VELOCITY) {
+        shouldOpen = false;
+      }
       translateX.value = withSpring(shouldOpen ? -DELETE_WIDTH : 0, springs.sheet);
     });
 
