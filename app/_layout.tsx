@@ -23,10 +23,14 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaListener } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
+import { BiometricLock } from "@/components/ui/BiometricLock";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { colors } from "@/constants/theme";
 import "@/global.css";
+import { initializeAnonymousSession } from "@/services/authService";
+import { fetchTransactions } from "@/services/databaseService";
 import { useOnboardingStore } from "@/store/useOnboardingStore";
+import { useTransactionStore } from "@/store/useTransactionStore";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -34,6 +38,30 @@ export default function RootLayout() {
   const hasCompletedOnboarding = useOnboardingStore(
     (state) => state.hasCompletedOnboarding,
   );
+  // hasCompletedOnboarding is read from disk asynchronously (zustand persist), so it's briefly
+  // `false` — its create()-time default — on every launch even for a returning user. Gating the
+  // splash screen (below) on this too avoids a flash of the onboarding flow before that read
+  // resolves and flips it to the real, persisted value.
+  const hasOnboardingHydrated = useOnboardingStore((state) => state.hasHydrated);
+  const importTransactions = useTransactionStore(
+    (state) => state.importTransactions,
+  );
+
+  useEffect(() => {
+    // Fire-and-forget: silent by design, and independent of BiometricLock's local gate, so it
+    // shouldn't block first paint. The Zustand transaction store only ever lives in memory, so
+    // every cold start needs this to repopulate it from Supabase — a failure here just leaves the
+    // list empty until the next successful sync, nothing for the user to act on at boot.
+    (async () => {
+      try {
+        await initializeAnonymousSession();
+        const transactions = await fetchTransactions();
+        importTransactions(transactions);
+      } catch (error) {
+        console.warn("[RootLayout] Failed to sync transactions from Supabase:", error);
+      }
+    })();
+  }, [importTransactions]);
 
   const [fontsLoaded, fontError] = useFonts({
     // On iOS fonts are resolved by their PostScript name (hyphenated), not the
@@ -52,12 +80,12 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if ((fontsLoaded || fontError) && hasOnboardingHydrated) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, hasOnboardingHydrated]);
 
-  if (!fontsLoaded && !fontError) {
+  if ((!fontsLoaded && !fontError) || !hasOnboardingHydrated) {
     return null;
   }
 
@@ -66,23 +94,25 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.void }}>
         <GluestackUIProvider mode="light">
           <StatusBar style="dark" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.void },
-            }}
-          >
-            <Stack.Protected guard={!hasCompletedOnboarding}>
-              <Stack.Screen name="onboarding" />
-            </Stack.Protected>
-            <Stack.Protected guard={hasCompletedOnboarding}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen
-                name="transactions"
-                options={{ animation: "slide_from_right" }}
-              />
-            </Stack.Protected>
-          </Stack>
+          <BiometricLock>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.void },
+              }}
+            >
+              <Stack.Protected guard={!hasCompletedOnboarding}>
+                <Stack.Screen name="onboarding" />
+              </Stack.Protected>
+              <Stack.Protected guard={hasCompletedOnboarding}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen
+                  name="transactions"
+                  options={{ animation: "slide_from_right" }}
+                />
+              </Stack.Protected>
+            </Stack>
+          </BiometricLock>
         </GluestackUIProvider>
       </GestureHandlerRootView>
     </SafeAreaListener>

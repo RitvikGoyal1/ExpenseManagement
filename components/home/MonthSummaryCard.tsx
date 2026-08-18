@@ -19,7 +19,8 @@ interface MonthSummaryCardProps {
 export function MonthSummaryCard({ summary }: MonthSummaryCardProps) {
   const { month, income, expenses, previousMonthExpenses } = summary;
   const net = income - expenses;
-  const changePercent = ((expenses - previousMonthExpenses) / previousMonthExpenses) * 100;
+  const changePercent =
+    previousMonthExpenses > 0 ? ((expenses - previousMonthExpenses) / previousMonthExpenses) * 100 : 0;
   // Spending less than last month is the good outcome, regardless of sign.
   const spentLessThanLastMonth = changePercent < 0;
   const spentRatio = income > 0 ? Math.min(expenses / income, 1) : 0;

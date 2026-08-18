@@ -9,6 +9,8 @@ interface TransactionStore {
   importTransactions: (transactions: Transaction[]) => void;
   /** Merges a partial patch into an existing transaction, e.g. a manual correction. */
   updateTransaction: (id: string, updatedData: Partial<Transaction>) => void;
+  /** Drops a single transaction locally — used by swipe-to-delete (optimistic; the caller re-adds it via addTransaction if the matching remote delete fails). */
+  removeTransaction: (id: string) => void;
   /** Wipes all transactions — used by the "Reset App Data" flow. */
   resetTransactions: () => void;
 }
@@ -24,5 +26,7 @@ export const useTransactionStore = create<TransactionStore>((set) => ({
         transaction.id === id ? { ...transaction, ...updatedData } : transaction,
       ),
     })),
+  removeTransaction: (id) =>
+    set((state) => ({ transactions: state.transactions.filter((transaction) => transaction.id !== id) })),
   resetTransactions: () => set({ transactions: [] }),
 }));

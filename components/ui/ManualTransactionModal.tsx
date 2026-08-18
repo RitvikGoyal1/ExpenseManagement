@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Box } from '@/components/ui/box';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Input, InputField } from '@/components/ui/input';
 import { Pressable as GluePressable } from '@/components/ui/pressable';
 import { ScrollView } from '@/components/ui/scroll-view';
@@ -15,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { springs } from '@/constants/motion';
 import { colors } from '@/constants/theme';
+import { insertTransaction } from '@/services/databaseService';
 import {
   DEDUCTION_CATEGORIES,
   DeductionCategory,
@@ -30,7 +32,6 @@ const HIDDEN_OFFSET = 820;
 const DISMISS_DISTANCE = 110;
 const DISMISS_VELOCITY = 800;
 const RUBBER_BAND_DIMENSION = 60;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 type TransactionType = 'expense' | 'income';
 
@@ -71,6 +72,7 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
   const [category, setCategory] = useState<TransactionCategory>('Other');
   const [isDeductible, setIsDeductible] = useState(false);
   const [deductionCategory, setDeductionCategory] = useState<DeductionCategory | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -84,6 +86,7 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
     setCategory('Other');
     setIsDeductible(false);
     setDeductionCategory(undefined);
+    setIsSaving(false);
 
     translateY.value = HIDDEN_OFFSET;
     translateY.value = withSpring(0, springs.sheet);
@@ -128,7 +131,9 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
       } else {
         translateY.value = withSpring(0, { ...springs.sheet, velocity: event.velocityY });
       }
-    });
+    })
+    // A cloud save is in flight — don't let a swipe rip the sheet away mid-save.
+    .enabled(!isSaving);
 
   const sheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -143,16 +148,6 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
   const keyboardSpacingStyle = useAnimatedStyle(() => ({
     paddingBottom: keyboardHeight.value,
   }));
-
-  const formattedDate = useMemo(
-    () => new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-    [date],
-  );
-
-  const handleStepDate = (direction: 1 | -1) => {
-    haptics.selection();
-    setDate(new Date(new Date(date).getTime() + direction * ONE_DAY_MS).toISOString());
-  };
 
   const handleSelectType = (next: TransactionType) => {
     if (next === type) {
@@ -177,7 +172,11 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (isSaving) {
+      return;
+    }
+
     const parsedAmount = Number(amountText);
     const magnitude = Number.isFinite(parsedAmount) ? Math.abs(parsedAmount) : 0;
     const isIncome = type === 'income';
@@ -192,20 +191,49 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
       deductionCategory: !isIncome && isDeductible ? deductionCategory : undefined,
     };
 
-    haptics.success();
-    animateClosed(0, () => onConfirm(transaction));
+    setIsSaving(true);
+    try {
+      // No receipt photo for a manual entry — image_url stays null in Supabase.
+      await insertTransaction(
+        {
+          merchant: transaction.merchant,
+          amount: transaction.amount,
+          date: transaction.date,
+          category: transaction.category,
+          isDeductible: transaction.isDeductible,
+        },
+        null,
+      );
+
+      haptics.success();
+      animateClosed(0, () => onConfirm(transaction));
+    } catch (error) {
+      console.warn('[ManualTransactionModal] Cloud save failed:', error);
+      haptics.error();
+      setIsSaving(false);
+      Alert.alert('Save failed', "We couldn't save this transaction. Check your connection and try again.");
+    }
+  };
+
+  // A cloud save is in flight — none of the dismiss paths (backdrop tap, X button, hardware back)
+  // should be able to close the sheet out from under it.
+  const handleRequestDismiss = () => {
+    if (isSaving) {
+      return;
+    }
+    animateClosed();
   };
 
   const isIncome = type === 'income';
   const tintColor = isIncome ? colors.income : colors.expense;
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={() => animateClosed()}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleRequestDismiss}>
       {/* Modal content lives in a separate native hierarchy — gesture-handler
           needs its own root here, the app-level one doesn't reach inside. */}
       <GestureHandlerRootView style={styles.fill}>
         <Box className="flex-1 justify-end">
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => animateClosed()}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleRequestDismiss} disabled={isSaving}>
             <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#020203' }, backdropStyle]} />
           </Pressable>
 
@@ -239,7 +267,7 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
                       <Text className="font-display-semibold text-base text-foreground">Add Transaction</Text>
                       <Text className="font-body text-xs text-muted-foreground">Enter the details by hand</Text>
                     </Box>
-                    <AnimatedPressable onPress={() => animateClosed()} hitSlop={8} scaleTo={0.85}>
+                    <AnimatedPressable onPress={handleRequestDismiss} disabled={isSaving} hitSlop={8} scaleTo={0.85}>
                       <Ionicons name="close" size={22} color={colors.textMuted} />
                     </AnimatedPressable>
                   </Box>
@@ -296,26 +324,7 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
                   </Box>
 
                   <Box className="mt-4">
-                    <Text className="mb-1.5 font-mono text-[11px] tracking-[1px] text-muted-foreground">DATE</Text>
-                    <Box className="flex-row items-center justify-between rounded-md border border-border bg-card px-2 py-1">
-                      <AnimatedPressable
-                        className="h-8 w-8 items-center justify-center rounded-full"
-                        onPress={() => handleStepDate(-1)}
-                        scaleTo={0.85}
-                        hitSlop={8}
-                      >
-                        <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
-                      </AnimatedPressable>
-                      <Text className="font-body-semibold text-[14px] text-foreground">{formattedDate}</Text>
-                      <AnimatedPressable
-                        className="h-8 w-8 items-center justify-center rounded-full"
-                        onPress={() => handleStepDate(1)}
-                        scaleTo={0.85}
-                        hitSlop={8}
-                      >
-                        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-                      </AnimatedPressable>
-                    </Box>
+                    <DatePickerField label="DATE" value={date} onChange={setDate} />
                   </Box>
 
                   {!isIncome && (
@@ -368,12 +377,13 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
                 <Box className="flex-row gap-3 px-6 pb-8 pt-4">
                   <AnimatedPressable
                     className="flex-1 items-center rounded-lg border border-border bg-card py-3.5"
-                    onPress={() => animateClosed()}
+                    onPress={handleRequestDismiss}
+                    disabled={isSaving}
                   >
                     <Text className="font-body-semibold text-[15px] text-foreground">Cancel</Text>
                   </AnimatedPressable>
                   <AnimatedPressable
-                    className="flex-[1.4] items-center rounded-lg py-3.5"
+                    className={`flex-[1.4] flex-row items-center justify-center gap-2 rounded-lg py-3.5 ${isSaving ? 'opacity-70' : ''}`}
                     style={{
                       backgroundColor: tintColor,
                       shadowColor: tintColor,
@@ -382,8 +392,12 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
                       shadowOffset: { width: 0, height: 4 },
                     }}
                     onPress={handleConfirm}
+                    disabled={isSaving}
                   >
-                    <Text className="font-body-bold text-[15px] text-glass">{isIncome ? 'Add Income' : 'Add Expense'}</Text>
+                    {isSaving && <ActivityIndicator size="small" color={colors.glass} />}
+                    <Text className="font-body-bold text-[15px] text-glass">
+                      {isSaving ? 'Saving…' : isIncome ? 'Add Income' : 'Add Expense'}
+                    </Text>
                   </AnimatedPressable>
                 </Box>
               </Animated.View>

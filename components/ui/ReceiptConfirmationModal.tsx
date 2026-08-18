@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Box } from '@/components/ui/box';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Input, InputField } from '@/components/ui/input';
 import { Pressable as GluePressable } from '@/components/ui/pressable';
 import { ScrollView } from '@/components/ui/scroll-view';
@@ -15,7 +16,9 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { springs } from '@/constants/motion';
 import { colors } from '@/constants/theme';
+import { insertTransaction } from '@/services/databaseService';
 import { ParsedReceiptData } from '@/services/ocrService';
+import { uploadReceiptImage } from '@/services/storageService';
 import {
   DEDUCTION_CATEGORIES,
   DeductionCategory,
@@ -31,7 +34,6 @@ const HIDDEN_OFFSET = 820;
 const DISMISS_DISTANCE = 110;
 const DISMISS_VELOCITY = 800;
 const RUBBER_BAND_DIMENSION = 60;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function rubberband(overshoot: number, dimension: number, constant = 0.55) {
   'worklet';
@@ -42,6 +44,8 @@ interface ReceiptConfirmationModalProps {
   visible: boolean;
   /** The OCR's best guess — null when OCR failed entirely, so every field opens blank for manual entry. */
   initialData: ParsedReceiptData | null;
+  /** The captured/picked photo's local URI — uploaded to Supabase Storage on confirm. */
+  imageUri: string;
   onCancel: () => void;
   onConfirm: (transaction: Transaction) => void;
 }
@@ -57,7 +61,7 @@ interface ReceiptConfirmationModalProps {
  * came back empty (blurry photo, API down), the fields just open blank —
  * the same form, filled in by hand instead of by machine.
  */
-export function ReceiptConfirmationModal({ visible, initialData, onCancel, onConfirm }: ReceiptConfirmationModalProps) {
+export function ReceiptConfirmationModal({ visible, initialData, imageUri, onCancel, onConfirm }: ReceiptConfirmationModalProps) {
   const translateY = useSharedValue(HIDDEN_OFFSET);
   const hasCrossedThreshold = useSharedValue(false);
   // Not KeyboardAvoidingView — this sheet lives inside a Modal with a transform-driven position,
@@ -72,6 +76,7 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
   const [category, setCategory] = useState<TransactionCategory>('Other');
   const [isDeductible, setIsDeductible] = useState(false);
   const [deductionCategory, setDeductionCategory] = useState<DeductionCategory | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -85,6 +90,7 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
     setCategory(initialData?.category ?? 'Other');
     setIsDeductible(initialData?.isTaxDeductible ?? false);
     setDeductionCategory(initialData?.isTaxDeductible ? 'Business Expense' : undefined);
+    setIsSaving(false);
 
     translateY.value = HIDDEN_OFFSET;
     translateY.value = withSpring(0, springs.sheet);
@@ -129,7 +135,9 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
       } else {
         translateY.value = withSpring(0, { ...springs.sheet, velocity: event.velocityY });
       }
-    });
+    })
+    // A cloud save is in flight — don't let a swipe rip the sheet away mid-upload.
+    .enabled(!isSaving);
 
   const sheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -145,16 +153,6 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
     paddingBottom: keyboardHeight.value,
   }));
 
-  const formattedDate = useMemo(
-    () => new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-    [date],
-  );
-
-  const handleStepDate = (direction: 1 | -1) => {
-    haptics.selection();
-    setDate(new Date(new Date(date).getTime() + direction * ONE_DAY_MS).toISOString());
-  };
-
   const handleToggleDeductible = (value: boolean) => {
     haptics.impact();
     setIsDeductible(value);
@@ -163,31 +161,75 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (isSaving) {
+      return;
+    }
+
     const parsedAmount = Number(amountText);
     const magnitude = Number.isFinite(parsedAmount) ? Math.abs(parsedAmount) : 0;
+    // initialData.lineItems is always an array (possibly empty) — normalize the empty case to
+    // undefined so an OCR miss doesn't leave a pointless `lineItems: []` sitting on the transaction.
+    const lineItems = initialData?.lineItems && initialData.lineItems.length > 0 ? initialData.lineItems : undefined;
 
-    const transaction: Transaction = {
-      id: `txn_${Date.now()}`,
-      merchant: merchant.trim() || 'Unknown Merchant',
-      category,
-      amount: -magnitude, // a scanned receipt is always an expense
-      date,
-      isDeductible,
-      deductionCategory: isDeductible ? deductionCategory : undefined,
-    };
+    setIsSaving(true);
+    try {
+      // Upload first, on purpose — insertTransaction only ever runs once a receipt image is
+      // actually sitting in storage, never for a transaction with nothing behind it.
+      const imagePath = await uploadReceiptImage(imageUri);
 
-    haptics.success();
-    animateClosed(0, () => onConfirm(transaction));
+      const transaction: Transaction = {
+        id: `txn_${Date.now()}`,
+        merchant: merchant.trim() || 'Unknown Merchant',
+        category,
+        amount: -magnitude, // a scanned receipt is always an expense
+        date,
+        isDeductible,
+        deductionCategory: isDeductible ? deductionCategory : undefined,
+        imagePath,
+        lineItems,
+      };
+
+      // deductionCategory doesn't round-trip to Supabase — the deployed "transactions" table has
+      // no column for it, so it stays local-only on the Zustand-side `transaction` object above.
+      await insertTransaction(
+        {
+          merchant: transaction.merchant,
+          amount: transaction.amount,
+          date: transaction.date,
+          category: transaction.category,
+          isDeductible: transaction.isDeductible,
+          lineItems: transaction.lineItems,
+        },
+        imagePath,
+      );
+
+      haptics.success();
+      animateClosed(0, () => onConfirm(transaction));
+    } catch (error) {
+      console.warn('[ReceiptConfirmationModal] Cloud save failed:', error);
+      haptics.error();
+      setIsSaving(false);
+      Alert.alert('Save failed', "We couldn't save this receipt. Check your connection and try again.");
+    }
+  };
+
+  // A cloud save is in flight — none of the dismiss paths (backdrop tap, X button, hardware
+  // back) should be able to close the sheet out from under it.
+  const handleRequestDismiss = () => {
+    if (isSaving) {
+      return;
+    }
+    animateClosed();
   };
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={() => animateClosed()}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleRequestDismiss}>
       {/* Modal content lives in a separate native hierarchy — gesture-handler
           needs its own root here, the app-level one doesn't reach inside. */}
       <GestureHandlerRootView style={styles.fill}>
         <Box className="flex-1 justify-end">
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => animateClosed()}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleRequestDismiss} disabled={isSaving}>
             <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#020203' }, backdropStyle]} />
           </Pressable>
 
@@ -223,7 +265,7 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
                         {initialData ? 'Review what we read — fix anything that looks off' : "We couldn't read this one — fill it in"}
                       </Text>
                     </Box>
-                    <AnimatedPressable onPress={() => animateClosed()} hitSlop={8} scaleTo={0.85}>
+                    <AnimatedPressable onPress={handleRequestDismiss} disabled={isSaving} hitSlop={8} scaleTo={0.85}>
                       <Ionicons name="close" size={22} color={colors.textMuted} />
                     </AnimatedPressable>
                   </Box>
@@ -258,26 +300,7 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
                   </Box>
 
                   <Box className="mt-4">
-                    <Text className="mb-1.5 font-mono text-[11px] tracking-[1px] text-muted-foreground">DATE</Text>
-                    <Box className="flex-row items-center justify-between rounded-md border border-border bg-card px-2 py-1">
-                      <AnimatedPressable
-                        className="h-8 w-8 items-center justify-center rounded-full"
-                        onPress={() => handleStepDate(-1)}
-                        scaleTo={0.85}
-                        hitSlop={8}
-                      >
-                        <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
-                      </AnimatedPressable>
-                      <Text className="font-body-semibold text-[14px] text-foreground">{formattedDate}</Text>
-                      <AnimatedPressable
-                        className="h-8 w-8 items-center justify-center rounded-full"
-                        onPress={() => handleStepDate(1)}
-                        scaleTo={0.85}
-                        hitSlop={8}
-                      >
-                        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-                      </AnimatedPressable>
-                    </Box>
+                    <DatePickerField label="DATE" value={date} onChange={setDate} />
                   </Box>
 
                   <Box className="mt-4">
@@ -326,16 +349,19 @@ export function ReceiptConfirmationModal({ visible, initialData, onCancel, onCon
                 <Box className="flex-row gap-3 px-6 pb-8 pt-4">
                   <AnimatedPressable
                     className="flex-1 items-center rounded-lg border border-border bg-card py-3.5"
-                    onPress={() => animateClosed()}
+                    onPress={handleRequestDismiss}
+                    disabled={isSaving}
                   >
                     <Text className="font-body-semibold text-[15px] text-foreground">Cancel</Text>
                   </AnimatedPressable>
                   <AnimatedPressable
-                    className="flex-[1.4] items-center rounded-lg bg-primary py-3.5"
+                    className={`flex-[1.4] flex-row items-center justify-center gap-2 rounded-lg bg-primary py-3.5 ${isSaving ? 'opacity-70' : ''}`}
                     style={{ shadowColor: colors.primary, shadowRadius: 12, shadowOpacity: 0.22, shadowOffset: { width: 0, height: 4 } }}
                     onPress={handleConfirm}
+                    disabled={isSaving}
                   >
-                    <Text className="font-body-bold text-[15px] text-glass">Confirm & Save</Text>
+                    {isSaving && <ActivityIndicator size="small" color={colors.glass} />}
+                    <Text className="font-body-bold text-[15px] text-glass">{isSaving ? 'Saving…' : 'Confirm & Save'}</Text>
                   </AnimatedPressable>
                 </Box>
               </Animated.View>

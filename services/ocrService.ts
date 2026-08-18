@@ -2,7 +2,7 @@ import { File } from 'expo-file-system';
 import { GoogleGenerativeAI, GoogleGenerativeAIFetchError, ObjectSchema, SchemaType } from '@google/generative-ai';
 import { Platform } from 'react-native';
 
-import { TRANSACTION_CATEGORIES, TransactionCategory } from '@/types/transaction';
+import { LineItem, TRANSACTION_CATEGORIES, TransactionCategory } from '@/types/transaction';
 
 // Expo inlines EXPO_PUBLIC_-prefixed vars into the client bundle at build time — set this in
 // a .env file (EXPO_PUBLIC_GEMINI_API_KEY=...) rather than committing a real key here.
@@ -21,6 +21,12 @@ const MOCK_RECEIPT_RESULT: ParsedReceiptData = {
   date: new Date().toISOString(),
   category: 'Shopping',
   isTaxDeductible: true,
+  lineItems: [
+    { description: '2x4 Lumber (8ft, 6-pack)', price: 24.97 },
+    { description: 'Wood Screws (1lb box)', price: 8.99 },
+    { description: 'Paint Roller Kit', price: 14.54 },
+    { description: 'Interior Latex Paint (1gal)', price: 34.98 },
+  ],
 };
 
 // Pinned to a specific version rather than a "-latest" alias: aliases get hot-swapped by Google
@@ -32,7 +38,11 @@ const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 const RECEIPT_PROMPT =
   'Analyze this receipt. Extract the vendor name, total amount, and date. Categorize the spending ' +
-  'into exactly one of the provided categories, and determine if it is likely a business tax deduction.';
+  'into exactly one of the provided categories, and determine if it is likely a business tax deduction. ' +
+  "Also read every individual line item on the receipt — don't stop at the total. For each distinct " +
+  'product or service purchased, list its own short description and its own price, even if the receipt ' +
+  'has many items. Skip subtotal/tax/total lines themselves (those are not items). If no individual ' +
+  'items are legible, return an empty items array rather than guessing.';
 
 // Enforced via `format: 'enum'` below so Gemini can only return a value that already fits our
 // TransactionCategory union — no free-text category to validate or translate on the way back.
@@ -61,9 +71,34 @@ const receiptSchema: ObjectSchema = {
       type: SchemaType.BOOLEAN,
       description: 'Whether this purchase is plausibly a deductible business expense.',
     },
+    items: {
+      type: SchemaType.ARRAY,
+      description:
+        'Every individual product or service line item on the receipt (not subtotal/tax/total lines). ' +
+        'Empty array if no items are legible.',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          description: {
+            type: SchemaType.STRING,
+            description: 'A short description of the purchased item as printed on the receipt.',
+          },
+          price: {
+            type: SchemaType.NUMBER,
+            description: "This item's own price, as a positive number.",
+          },
+        },
+        required: ['description', 'price'],
+      },
+    },
   },
-  required: ['vendorName', 'totalAmount', 'transactionDate', 'category', 'isTaxDeductible'],
+  required: ['vendorName', 'totalAmount', 'transactionDate', 'category', 'isTaxDeductible', 'items'],
 };
+
+interface GeminiLineItem {
+  description: string;
+  price: number;
+}
 
 interface GeminiReceiptResult {
   vendorName: string;
@@ -71,6 +106,7 @@ interface GeminiReceiptResult {
   transactionDate: string;
   category: string;
   isTaxDeductible: boolean;
+  items: GeminiLineItem[];
 }
 
 export interface ParsedReceiptData {
@@ -81,6 +117,8 @@ export interface ParsedReceiptData {
   date: string;
   category: TransactionCategory;
   isTaxDeductible: boolean;
+  /** Always an array (possibly empty) — the OCR.space fallback has no item-extraction capability at all. */
+  lineItems: LineItem[];
 }
 
 function getModel() {
@@ -149,6 +187,15 @@ function withTimeout<T>(task: Promise<T>, ms: number, controller: AbortControlle
   });
 }
 
+function mapLineItems(items: GeminiLineItem[] | undefined): LineItem[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .filter((item) => item && typeof item.description === 'string' && item.description.trim() && Number.isFinite(item.price))
+    .map((item) => ({ description: item.description.trim(), price: Math.abs(item.price) }));
+}
+
 function mapGeminiResult(result: GeminiReceiptResult): ParsedReceiptData {
   return {
     merchant: result.vendorName?.trim() || 'Unknown Merchant',
@@ -156,6 +203,7 @@ function mapGeminiResult(result: GeminiReceiptResult): ParsedReceiptData {
     date: normalizeDate(result.transactionDate),
     category: isTransactionCategory(result.category) ? result.category : 'Other',
     isTaxDeductible: Boolean(result.isTaxDeductible),
+    lineItems: mapLineItems(result.items),
   };
 }
 
@@ -404,7 +452,7 @@ function extractDate(text: string): string {
   return new Date().toISOString();
 }
 
-/** OCR.space has no concept of category or tax deductibility — those default the same way the pre-Gemini UI did. */
+/** OCR.space has no concept of category, tax deductibility, or line items — those default the same way the pre-Gemini UI did. */
 function parseReceiptText(rawText: string): ParsedReceiptData {
   return {
     merchant: extractVendor(rawText),
@@ -412,6 +460,7 @@ function parseReceiptText(rawText: string): ParsedReceiptData {
     date: extractDate(rawText),
     category: 'Other',
     isTaxDeductible: false,
+    lineItems: [],
   };
 }
 

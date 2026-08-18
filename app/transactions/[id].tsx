@@ -5,9 +5,11 @@ import { Platform } from 'react-native';
 
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { Box } from '@/components/ui/box';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { Input, InputField } from '@/components/ui/input';
 import { KeyboardAvoidingView } from '@/components/ui/keyboard-avoiding-view';
 import { Pressable } from '@/components/ui/pressable';
+import { ReceiptImageViewer } from '@/components/ui/ReceiptImageViewer';
 import { SafeAreaView } from '@/components/ui/safe-area-view';
 import { ScrollView } from '@/components/ui/scroll-view';
 import { Switch } from '@/components/ui/switch';
@@ -15,9 +17,8 @@ import { Text } from '@/components/ui/text';
 import { colors } from '@/constants/theme';
 import { useTransactionStore } from '@/store/useTransactionStore';
 import { DEDUCTION_CATEGORIES, DeductionCategory, TRANSACTION_CATEGORIES, TransactionCategory } from '@/types/transaction';
+import { formatCurrency } from '@/utils/format';
 import { haptics } from '@/utils/haptics';
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -33,6 +34,7 @@ export default function TransactionDetailScreen() {
   const [deductionCategory, setDeductionCategory] = useState<DeductionCategory | undefined>(
     transaction?.deductionCategory,
   );
+  const [isReceiptViewerVisible, setIsReceiptViewerVisible] = useState(false);
 
   const parsedAmount = useMemo(() => {
     const value = Number(amountText);
@@ -40,15 +42,6 @@ export default function TransactionDetailScreen() {
   }, [amountText]);
 
   const isIncome = parsedAmount > 0;
-  const formattedDate = useMemo(
-    () => new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-    [date],
-  );
-
-  const handleStepDate = (direction: 1 | -1) => {
-    haptics.selection();
-    setDate(new Date(new Date(date).getTime() + direction * ONE_DAY_MS).toISOString());
-  };
 
   const handleToggleDeductible = (value: boolean) => {
     haptics.impact();
@@ -112,6 +105,35 @@ export default function TransactionDetailScreen() {
           </Box>
 
           <Box className="mt-8">
+            <Text className="mb-2 font-mono text-[11px] tracking-[1px] text-muted-foreground">RECEIPT</Text>
+            {transaction.imagePath ? (
+              <AnimatedPressable
+                className="flex-row items-center rounded-lg border border-border bg-card p-4"
+                onPress={() => setIsReceiptViewerVisible(true)}
+              >
+                <Box className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-primary/16">
+                  <Ionicons name="receipt-outline" size={18} color={colors.primary} />
+                </Box>
+                <Box className="flex-1">
+                  <Text className="font-body-semibold text-[15px] text-foreground">View Original Receipt</Text>
+                  <Text className="mt-0.5 font-body text-xs text-muted-foreground">Open the scanned image</Text>
+                </Box>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </AnimatedPressable>
+            ) : (
+              <Box className="flex-row items-center rounded-lg border border-border bg-card p-4">
+                <Box className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-muted">
+                  <Ionicons name="create-outline" size={18} color={colors.textMuted} />
+                </Box>
+                <Box className="flex-1">
+                  <Text className="font-body-semibold text-[15px] text-foreground">Entered Manually</Text>
+                  <Text className="mt-0.5 font-body text-xs text-muted-foreground">No receipt image — this transaction was added by hand.</Text>
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          <Box className="mt-8">
             <Text className="mb-2 font-mono text-[11px] tracking-[1px] text-muted-foreground">VENDOR</Text>
             <Input className="rounded-md border border-border bg-card px-4 py-3.5">
               <InputField
@@ -124,16 +146,7 @@ export default function TransactionDetailScreen() {
           </Box>
 
           <Box className="mt-8">
-            <Text className="mb-2 font-mono text-[11px] tracking-[1px] text-muted-foreground">DATE</Text>
-            <Box className="flex-row items-center justify-between rounded-md border border-border bg-card px-2 py-1">
-              <AnimatedPressable className="h-8 w-8 items-center justify-center rounded-full" onPress={() => handleStepDate(-1)} scaleTo={0.85} hitSlop={8}>
-                <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
-              </AnimatedPressable>
-              <Text className="font-body-semibold text-[15px] text-foreground">{formattedDate}</Text>
-              <AnimatedPressable className="h-8 w-8 items-center justify-center rounded-full" onPress={() => handleStepDate(1)} scaleTo={0.85} hitSlop={8}>
-                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-              </AnimatedPressable>
-            </Box>
+            <DatePickerField label="DATE" value={date} onChange={setDate} />
           </Box>
 
           <Box className="mt-8">
@@ -144,6 +157,25 @@ export default function TransactionDetailScreen() {
               ))}
             </Box>
           </Box>
+
+          {transaction.lineItems && transaction.lineItems.length > 0 && (
+            <Box className="mt-8">
+              <Text className="mb-2 font-mono text-[11px] tracking-[1px] text-muted-foreground">ITEMS</Text>
+              <Box className="rounded-lg border border-border bg-card px-4">
+                {transaction.lineItems.map((item, index) => (
+                  <Box key={`${item.description}-${index}`}>
+                    {index > 0 && <Box className="h-px bg-border" />}
+                    <Box className="flex-row items-center justify-between py-3">
+                      <Text className="mr-2 flex-1 font-body-medium text-[14px] text-foreground" isTruncated>
+                        {item.description}
+                      </Text>
+                      <Text className="font-mono-semibold text-[13px] text-foreground">{formatCurrency(item.price)}</Text>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
 
           <Box className="mt-8 gap-4 rounded-lg border border-border bg-card p-4">
             <Box className="flex-row items-center">
@@ -189,6 +221,14 @@ export default function TransactionDetailScreen() {
           </AnimatedPressable>
         </Box>
       </KeyboardAvoidingView>
+
+      {transaction.imagePath && (
+        <ReceiptImageViewer
+          visible={isReceiptViewerVisible}
+          imagePath={transaction.imagePath}
+          onClose={() => setIsReceiptViewerVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }

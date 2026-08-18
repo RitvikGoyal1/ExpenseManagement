@@ -212,6 +212,7 @@ export default function ScanScreen() {
         <ReceiptConfirmationModal
           visible={isConfirmVisible}
           initialData={parsedReceipt}
+          imageUri={capturedUri}
           onCancel={handleCancelReceipt}
           onConfirm={handleConfirmReceipt}
         />

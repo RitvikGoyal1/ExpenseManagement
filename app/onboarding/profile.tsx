@@ -74,9 +74,12 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom"]}>
       <Box className="flex-1 px-8 pt-6">
-        <FadeSlideIn className="mb-8 flex-row gap-1">
-          <Box className="h-1 w-7 rounded-full bg-primary" />
-          <Box className="h-1 w-7 rounded-full bg-border" />
+        <FadeSlideIn className="mb-8 flex-row items-center justify-between">
+          <Box className="flex-row gap-1">
+            <Box className="h-1 w-7 rounded-full bg-primary" />
+            <Box className="h-1 w-7 rounded-full bg-border" />
+          </Box>
+          <MockDataToggle />
         </FadeSlideIn>
 
         <FadeSlideIn delay={40}>
@@ -102,6 +105,33 @@ export default function ProfileScreen() {
         </Box>
       </Box>
     </SafeAreaView>
+  );
+}
+
+function MockDataToggle() {
+  const useMockData = useOnboardingStore((state) => state.useMockData);
+  const setUseMockData = useOnboardingStore((state) => state.setUseMockData);
+
+  const handleToggle = useCallback(() => {
+    haptics.selection();
+    setUseMockData(!useMockData);
+  }, [useMockData, setUseMockData]);
+
+  return (
+    <AnimatedPressable
+      className={`flex-row items-center gap-1.5 rounded-full border px-3 py-1.5 ${useMockData ? "border-primary bg-primary/16" : "border-border bg-card"}`}
+      onPress={handleToggle}
+      hitSlop={8}
+    >
+      <Ionicons
+        name={useMockData ? "checkbox" : "square-outline"}
+        size={16}
+        color={useMockData ? colors.primary : colors.textMuted}
+      />
+      <Text className="font-body-medium text-xs text-muted-foreground">
+        Mock?
+      </Text>
+    </AnimatedPressable>
   );
 }
 

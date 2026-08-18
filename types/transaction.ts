@@ -35,6 +35,12 @@ export const TRANSACTION_CATEGORIES: TransactionCategory[] = [
   'Other',
 ];
 
+/** A single purchased item extracted from a receipt (Gemini OCR) — description + its own price. */
+export interface LineItem {
+  description: string;
+  price: number;
+}
+
 export interface Transaction {
   id: string;
   merchant: string;
@@ -47,6 +53,10 @@ export interface Transaction {
   isDeductible: boolean;
   /** Only meaningful when isDeductible is true. */
   deductionCategory?: DeductionCategory;
+  /** Supabase Storage object path for the scanned receipt — undefined for a manual entry. */
+  imagePath?: string;
+  /** Individual items Gemini read off the receipt — undefined/empty for manual entries or an unreadable receipt. */
+  lineItems?: LineItem[];
 }
 
 export interface MonthlySummary {

@@ -32,6 +32,7 @@ export default function ImportScreen() {
 
   const importTransactions = useTransactionStore((state) => state.importTransactions);
   const completeOnboarding = useOnboardingStore((state) => state.completeOnboarding);
+  const useMockData = useOnboardingStore((state) => state.useMockData);
 
   useEffect(() => {
     return () => {
@@ -46,6 +47,17 @@ export default function ImportScreen() {
       return;
     }
     haptics.impact(Haptics.ImpactFeedbackStyle.Medium);
+
+    if (!useMockData) {
+      // No mock data requested — skip the fake inbox scan entirely and drop
+      // straight into the main app with an empty transaction store.
+      haptics.success();
+      InteractionManager.runAfterInteractions(() => {
+        completeOnboarding();
+      });
+      return;
+    }
+
     setIsSyncing(true);
     setActiveStep(0);
 
@@ -81,7 +93,7 @@ export default function ImportScreen() {
       importTransactions(transactions);
       completeOnboarding();
     });
-  }, [completeOnboarding, importTransactions, isSyncing]);
+  }, [completeOnboarding, importTransactions, isSyncing, useMockData]);
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
@@ -93,15 +105,20 @@ export default function ImportScreen() {
 
         <FadeSlideIn delay={40}>
           <Box className="mb-6 h-16 w-16 items-center justify-center rounded-full bg-primary/16">
-            <Ionicons name="mail-open-outline" size={32} color={colors.primary} />
+            <Ionicons
+              name={useMockData ? 'mail-open-outline' : 'sparkles-outline'}
+              size={32}
+              color={colors.primary}
+            />
           </Box>
 
           <GradientText className="font-display-bold text-[28px] leading-[34px] tracking-[-0.5px] text-foreground">
-            Let&apos;s find your past digital receipts.
+            {useMockData ? "Let's find your past digital receipts." : "You're all set."}
           </GradientText>
           <Text className="mt-2 font-body text-base leading-[22px] text-secondary-foreground">
-            Connect your inbox and we&apos;ll automatically import receipts from the last 3 months, so
-            your dashboard starts full instead of empty.
+            {useMockData
+              ? "Connect your inbox and we'll automatically import receipts from the last 3 months, so your dashboard starts full instead of empty."
+              : "You're starting with a clean slate — no accounts, no transactions. Add one manually or scan a receipt whenever you're ready."}
           </Text>
         </FadeSlideIn>
 
@@ -116,7 +133,7 @@ export default function ImportScreen() {
               })}
             </Box>
           </FadeSlideIn>
-        ) : (
+        ) : useMockData ? (
           <FadeSlideIn>
             <AnimatedPressable
               className="flex-row items-center justify-center gap-2 rounded-lg bg-primary py-[18px]"
@@ -131,6 +148,17 @@ export default function ImportScreen() {
               <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} />
               <Text className="font-body text-xs text-muted-foreground">We only scan for receipts. Your password is never stored.</Text>
             </Box>
+          </FadeSlideIn>
+        ) : (
+          <FadeSlideIn>
+            <AnimatedPressable
+              className="flex-row items-center justify-center gap-2 rounded-lg bg-primary py-[18px]"
+              style={{ shadowColor: colors.primary, shadowRadius: 14, shadowOpacity: 0.22, shadowOffset: { width: 0, height: 5 } }}
+              onPress={handleConnect}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+              <Text className="font-body-bold text-[17px] text-glass">Get Started</Text>
+            </AnimatedPressable>
           </FadeSlideIn>
         )}
       </Box>
