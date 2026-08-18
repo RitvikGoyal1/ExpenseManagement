@@ -181,29 +181,35 @@ export function ManualTransactionModal({ visible, onCancel, onConfirm }: ManualT
     const magnitude = Number.isFinite(parsedAmount) ? Math.abs(parsedAmount) : 0;
     const isIncome = type === 'income';
 
-    const transaction: Transaction = {
-      id: `txn_${Date.now()}`,
-      merchant: merchant.trim() || (isIncome ? 'Unknown Source' : 'Unknown Merchant'),
-      category,
-      amount: isIncome ? magnitude : -magnitude,
-      date,
-      isDeductible: !isIncome && isDeductible,
-      deductionCategory: !isIncome && isDeductible ? deductionCategory : undefined,
-    };
+    const merchantName = merchant.trim() || (isIncome ? 'Unknown Source' : 'Unknown Merchant');
+    const amount = isIncome ? magnitude : -magnitude;
+    const transactionDeductible = !isIncome && isDeductible;
 
     setIsSaving(true);
     try {
-      // No receipt photo for a manual entry — image_url stays null in Supabase.
-      await insertTransaction(
+      // No receipt photo for a manual entry — image_url stays null in Supabase. The id comes back
+      // from Supabase (not a client-generated one) so a later swipe-to-delete can target this exact
+      // row.
+      const id = await insertTransaction(
         {
-          merchant: transaction.merchant,
-          amount: transaction.amount,
-          date: transaction.date,
-          category: transaction.category,
-          isDeductible: transaction.isDeductible,
+          merchant: merchantName,
+          amount,
+          date,
+          category,
+          isDeductible: transactionDeductible,
         },
         null,
       );
+
+      const transaction: Transaction = {
+        id,
+        merchant: merchantName,
+        category,
+        amount,
+        date,
+        isDeductible: transactionDeductible,
+        deductionCategory: transactionDeductible ? deductionCategory : undefined,
+      };
 
       haptics.success();
       animateClosed(0, () => onConfirm(transaction));

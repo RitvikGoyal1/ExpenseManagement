@@ -178,31 +178,36 @@ export function ReceiptConfirmationModal({ visible, initialData, imageUri, onCan
       // actually sitting in storage, never for a transaction with nothing behind it.
       const imagePath = await uploadReceiptImage(imageUri);
 
+      const merchantName = merchant.trim() || 'Unknown Merchant';
+      const amount = -magnitude; // a scanned receipt is always an expense
+
+      // deductionCategory doesn't round-trip to Supabase — the deployed "transactions" table has
+      // no column for it, so it stays local-only on the Zustand-side `transaction` object below.
+      // The id comes back from Supabase (not a client-generated one) so a later swipe-to-delete
+      // can target this exact row.
+      const id = await insertTransaction(
+        {
+          merchant: merchantName,
+          amount,
+          date,
+          category,
+          isDeductible,
+          lineItems,
+        },
+        imagePath,
+      );
+
       const transaction: Transaction = {
-        id: `txn_${Date.now()}`,
-        merchant: merchant.trim() || 'Unknown Merchant',
+        id,
+        merchant: merchantName,
         category,
-        amount: -magnitude, // a scanned receipt is always an expense
+        amount,
         date,
         isDeductible,
         deductionCategory: isDeductible ? deductionCategory : undefined,
         imagePath,
         lineItems,
       };
-
-      // deductionCategory doesn't round-trip to Supabase — the deployed "transactions" table has
-      // no column for it, so it stays local-only on the Zustand-side `transaction` object above.
-      await insertTransaction(
-        {
-          merchant: transaction.merchant,
-          amount: transaction.amount,
-          date: transaction.date,
-          category: transaction.category,
-          isDeductible: transaction.isDeductible,
-          lineItems: transaction.lineItems,
-        },
-        imagePath,
-      );
 
       haptics.success();
       animateClosed(0, () => onConfirm(transaction));

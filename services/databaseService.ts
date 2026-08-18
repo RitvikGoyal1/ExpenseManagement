@@ -55,7 +55,9 @@ function isTransactionCategory(value: string | null): value is TransactionCatego
 
 /**
  * Inserts a confirmed transaction into the "transactions" table under the current anonymous (or,
- * later, real) user, optionally pointing it at an already-uploaded receipt image.
+ * later, real) user, optionally pointing it at an already-uploaded receipt image. Returns the
+ * server-generated row id — callers must use this (not a client-generated id) as the local Zustand
+ * transaction's id, since deleteTransaction below targets rows by that same `uuid` column.
  *
  * `imagePath` is `null` for a manual entry (ManualTransactionModal — no photo involved) and the
  * storage object path for a scanned receipt (ReceiptConfirmationModal, after uploadReceiptImage
@@ -64,7 +66,7 @@ function isTransactionCategory(value: string | null): value is TransactionCatego
  * callers should only reach this after uploadReceiptImage has resolved, so a transaction row never
  * gets created for a receipt image that didn't actually make it to storage.
  */
-export async function insertTransaction(transactionData: TransactionInput, imagePath: string | null): Promise<void> {
+export async function insertTransaction(transactionData: TransactionInput, imagePath: string | null): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -72,20 +74,26 @@ export async function insertTransaction(transactionData: TransactionInput, image
     throw new Error('No authenticated Supabase user — cannot insert a transaction.');
   }
 
-  const { error } = await supabase.from(TRANSACTIONS_TABLE).insert({
-    user_id: user.id,
-    vendor_name: transactionData.merchant,
-    total_amount: transactionData.amount,
-    transaction_date: transactionData.date,
-    category: transactionData.category,
-    is_tax_deductible: transactionData.isDeductible,
-    image_url: imagePath,
-    line_items: transactionData.lineItems && transactionData.lineItems.length > 0 ? transactionData.lineItems : null,
-  });
+  const { data, error } = await supabase
+    .from(TRANSACTIONS_TABLE)
+    .insert({
+      user_id: user.id,
+      vendor_name: transactionData.merchant,
+      total_amount: transactionData.amount,
+      transaction_date: transactionData.date,
+      category: transactionData.category,
+      is_tax_deductible: transactionData.isDeductible,
+      image_url: imagePath,
+      line_items: transactionData.lineItems && transactionData.lineItems.length > 0 ? transactionData.lineItems : null,
+    })
+    .select('id')
+    .single();
 
   if (error) {
     throw error;
   }
+
+  return data.id;
 }
 
 /**
@@ -181,8 +189,8 @@ function isNetWorthItemType(value: string): value is NetWorthItemType {
 
 /**
  * Inserts a net worth line item under the current anonymous (or, later, real) user and returns the
- * server-generated row id — needed (unlike insertTransaction) because deleteNetWorthItem below has
- * to target that exact row, and there's no other client-side id to fall back on.
+ * server-generated row id — needed because deleteNetWorthItem below has to target that exact row,
+ * and there's no other client-side id to fall back on.
  */
 export async function insertNetWorthItem(item: NetWorthItemInput): Promise<string> {
   const {
